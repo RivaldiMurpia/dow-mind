@@ -190,6 +190,71 @@ func (h *Handlers) ReindexProject(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// WatchProject handles POST /api/projects/{id}/watch.
+// Indexes the directory immediately, then re-indexes automatically
+// (debounced) whenever files change. Expects {"directory": "/abs/path"}.
+func (h *Handlers) WatchProject(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "id")
+	if projectID == "" {
+		writeErr(w, http.StatusBadRequest, "project id is required")
+		return
+	}
+
+	var req struct {
+		Directory string `json:"directory"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+	if req.Directory == "" {
+		writeErr(w, http.StatusBadRequest, "directory is required")
+		return
+	}
+
+	result, err := h.svc.WatchProject(r.Context(), projectID, req.Directory)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	info, _ := h.svc.WatchStatus(projectID)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":         "watching",
+		"project_id":     projectID,
+		"watch":          info,
+		"chunks_indexed": result.Indexed,
+		"files_scanned":  result.FilesScanned,
+	})
+}
+
+// UnwatchProject handles DELETE /api/projects/{id}/watch.
+// Stops the directory watch; the indexed data is kept.
+func (h *Handlers) UnwatchProject(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "id")
+	if projectID == "" {
+		writeErr(w, http.StatusBadRequest, "project id is required")
+		return
+	}
+	if err := h.svc.UnwatchProject(projectID); err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "unwatched", "project_id": projectID})
+}
+
+// WatchStatus handles GET /api/projects/{id}/watch.
+// Returns the watch info, or 404 when the project is not watched.
+func (h *Handlers) WatchStatus(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "id")
+	if projectID == "" {
+		writeErr(w, http.StatusBadRequest, "project id is required")
+		return
+	}
+	info, ok := h.svc.WatchStatus(projectID)
+	if !ok {
+		writeErr(w, http.StatusNotFound, "project is not being watched")
+		return
+	}
+	writeJSON(w, http.StatusOK, info)
+}
+
 // DeleteProject handles DELETE /api/projects/{id}.
 // Deletes the project collection.
 func (h *Handlers) DeleteProject(w http.ResponseWriter, r *http.Request) {

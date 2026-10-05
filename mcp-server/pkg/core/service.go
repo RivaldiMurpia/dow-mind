@@ -108,6 +108,10 @@ type Service struct {
 	metrics      *Metrics
 	metricsStore MetricsStore // optional durable metrics; nil = in-memory only
 	backend      string       // vector store name (e.g. "qdrant"), set by main.go
+	// watches holds active directory watches (projectID -> handle).
+	// Watches are in-memory only and do not survive restarts.
+	watchMu sync.Mutex
+	watches map[string]*watchHandle
 }
 
 // MetricsStore is an optional durable sink for query metrics, injected into

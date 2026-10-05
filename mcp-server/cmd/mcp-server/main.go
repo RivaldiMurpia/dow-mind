@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/debug"
+	"strings"
 	"time"
 
 	"github.com/RivaldiMurpia/dow-mind/pkg/config"
@@ -64,8 +65,11 @@ type RuntimeConfig struct {
 	OpenAIModel   string
 	OpenAIBaseURL string
 	OpenAIDim     int
-	RerankerModel string
-	VectorDim     int
+	RerankerModel    string
+	RerankerProvider string
+	CohereAPIKey     string
+	CohereModel      string
+	VectorDim        int
 }
 
 // resolveConfig builds a RuntimeConfig from the three-tier priority:
@@ -91,8 +95,11 @@ func resolveConfig() (*RuntimeConfig, error) {
 		OpenAIModel:   cfg.OpenAI.Model,
 		OpenAIBaseURL: cfg.OpenAI.BaseURL,
 		OpenAIDim:     cfg.OpenAI.Dim,
-		RerankerModel: cfg.RerankerModel,
-		VectorDim:     cfg.Voyage.Dim,
+		RerankerModel:    cfg.RerankerModel,
+		RerankerProvider: cfg.RerankerProvider,
+		CohereAPIKey:     cfg.CohereAPIKey,
+		CohereModel:      cfg.CohereModel,
+		VectorDim:        cfg.Voyage.Dim,
 	}
 
 	// Fall back to tei if voyage key is missing and embedder wasn't set
@@ -136,6 +143,15 @@ type CreateProjectInput struct {
 
 type DeleteProjectInput struct {
 	ProjectID string `json:"project_id" jsonschema:"Unique identifier for the project/collection"`
+}
+
+type WatchProjectInput struct {
+	ProjectID string `json:"project_id" jsonschema:"Project identifier"`
+	Directory string `json:"directory" jsonschema:"Absolute path of the directory to index and watch"`
+}
+
+type UnwatchProjectInput struct {
+	ProjectID string `json:"project_id" jsonschema:"Project identifier"`
 }
 
 type IndexProjectInput struct {
@@ -238,13 +254,24 @@ func main() {
 	// Build the service layer that wraps provider + indexer.
 	idx := indexer.NewIndexer(provider, 1500)
 
-	// Build the reranker when a model is configured and the Voyage API key
-	// is available. The reranker shares the same Voyage API key used for
-	// embeddings. When RerankerModel is empty, reranker is nil and
-	// Search with Rerank=true silently falls back to semantic order.
+	// Build the reranker selected by cfg.RerankerProvider ("voyage" default,
+	// "cohere", or "none" to disable). When the selected backend has no
+	// usable credentials the reranker stays nil and Search with Rerank=true
+	// silently falls back to semantic order.
 	var reranker rag.Reranker
-	if cfg.RerankerModel != "" && cfg.VoyageAPIKey != "" {
-		reranker = rag.NewVoyageReranker(cfg.VoyageAPIKey, cfg.RerankerModel)
+	switch strings.ToLower(strings.TrimSpace(cfg.RerankerProvider)) {
+	case "cohere":
+		if cfg.CohereAPIKey != "" {
+			reranker = rag.NewCohereReranker(cfg.CohereAPIKey, cfg.CohereModel)
+		} else {
+			fmt.Fprintf(os.Stderr, "warning: reranker_provider=cohere but no Cohere API key (DOWMIND_COHERE_API_KEY); reranking disabled\n")
+		}
+	case "none", "off", "disabled":
+		// explicitly disabled; reranker stays nil
+	default: // "voyage" and anything unrecognized (backwards compatible)
+		if cfg.RerankerModel != "" && cfg.VoyageAPIKey != "" {
+			reranker = rag.NewVoyageReranker(cfg.VoyageAPIKey, cfg.RerankerModel)
+		}
 	}
 
 	svc := buildService(provider, reranker, idx)
@@ -481,5 +508,35 @@ func registerMCPTools(server *mcp.Server, svc *core.Service) {
 			"embed_model":    svc.EmbedModel(),
 			"metrics":        m,
 		}, nil
+	})
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "mind_watch_project",
+		Description: "Index a project directory immediately, then keep it fresh: re-index automatically (debounced) whenever files change. Watches are in-memory and do not survive server restarts.",
+	}, func(ctx context.Context, req *mcp.CallToolRequest, in WatchProjectInput) (*mcp.CallToolResult, any, error) {
+		indexCtx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+		defer cancel()
+		result, err := svc.WatchProject(indexCtx, in.ProjectID, in.Directory)
+		if err != nil {
+			return nil, nil, err
+		}
+		info, _ := svc.WatchStatus(in.ProjectID)
+		return nil, map[string]any{
+			"status":         "watching",
+			"project_id":     in.ProjectID,
+			"watch":          info,
+			"chunks_indexed": result.Indexed,
+			"files_scanned":  result.FilesScanned,
+		}, nil
+	})
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "mind_unwatch_project",
+		Description: "Stop the directory watch for a project. Indexed data is kept; only automatic re-indexing stops.",
+	}, func(ctx context.Context, req *mcp.CallToolRequest, in UnwatchProjectInput) (*mcp.CallToolResult, any, error) {
+		if err := svc.UnwatchProject(in.ProjectID); err != nil {
+			return nil, nil, err
+		}
+		return nil, map[string]any{"status": "unwatched", "project_id": in.ProjectID}, nil
 	})
 }

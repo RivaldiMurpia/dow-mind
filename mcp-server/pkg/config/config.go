@@ -46,6 +46,12 @@ type Config struct {
 	ChromaURL     string       `yaml:"chroma_url"`
 	TEIURL        string       `yaml:"tei_url"`
 	RerankerModel string       `yaml:"reranker_model"`
+	// RerankerProvider selects the rerank backend: "voyage" (default),
+	// "cohere", or "none" to disable reranking entirely.
+	RerankerProvider string `yaml:"reranker_provider"`
+	// CohereAPIKey / CohereModel configure the Cohere rerank backend.
+	CohereAPIKey string `yaml:"cohere_api_key"`
+	CohereModel  string `yaml:"cohere_model"`
 	// AdminToken, when set, gates /api and /mcp with a bearer token. The env var
 	// DOWMIND_ADMIN_TOKEN takes precedence over this file value (see EffectiveAdminToken).
 	AdminToken string `yaml:"admin_token,omitempty"`
@@ -78,6 +84,10 @@ func Default() *Config {
 		QdrantURL: "http://localhost:6333",
 		ChromaURL: "http://localhost:8000",
 		TEIURL:    "http://localhost:8081",
+		// Rerank backends: voyage is the historical default (preserved for
+		// backwards compatibility); cohere needs DOWMIND_COHERE_API_KEY.
+		RerankerProvider: "voyage",
+		CohereModel:      "rerank-v3.5",
 	}
 }
 
@@ -217,6 +227,15 @@ func applyEnvOverrides(cfg *Config) {
 	}
 	if v := os.Getenv("DOWMIND_RERANKER_MODEL"); v != "" {
 		cfg.RerankerModel = v
+	}
+	if v := os.Getenv("DOWMIND_RERANKER"); v != "" {
+		cfg.RerankerProvider = v
+	}
+	if v := os.Getenv("DOWMIND_COHERE_API_KEY"); v != "" {
+		cfg.CohereAPIKey = v
+	}
+	if v := os.Getenv("DOWMIND_COHERE_MODEL"); v != "" {
+		cfg.CohereModel = v
 	}
 	if v := os.Getenv("DOWMIND_VECTOR_DIM"); v != "" {
 		if d, err := strconv.Atoi(v); err == nil && d > 0 {

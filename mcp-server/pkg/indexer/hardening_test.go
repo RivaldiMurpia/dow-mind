@@ -37,49 +37,66 @@ func TestIsSecretFile(t *testing.T) {
 	}
 }
 
-// TestChunkTextWithOverlap verifies that consecutive chunks share trailing
-// context and that edge cases degrade gracefully.
-func TestChunkTextWithOverlap(t *testing.T) {
-	// Build ~30 lines of ~40 chars => ~1200 chars total, chunkSize 500.
+// TestChunkCode_PrefersBlankLineBoundaries verifies chunks are cut at blank
+// lines (function boundaries) rather than mid-function when possible.
+func TestChunkCode_PrefersBlankLineBoundaries(t *testing.T) {
+	fn1 := "func alpha() {\n\tline1\n\tline2\n}"
+	fn2 := "func beta() {\n\tline3\n\tline4\n}"
+	text := fn1 + "\n\n" + fn2
+
+	// chunkSize fits one function but not both.
+	chunks := chunkCode(text, len(fn1)+10)
+	if len(chunks) != 2 {
+		t.Fatalf("expected 2 chunks, got %d: %q", len(chunks), chunks)
+	}
+	if chunks[0] != fn1 {
+		t.Errorf("chunk[0] = %q, want function alpha intact", chunks[0])
+	}
+	if chunks[1] != fn2 {
+		t.Errorf("chunk[1] = %q, want function beta intact", chunks[1])
+	}
+}
+
+// TestChunkCode_FallsBackToLines verifies oversized blocks (no blank lines)
+// degrade to the old line-based splitting.
+func TestChunkCode_FallsBackToLines(t *testing.T) {
 	var sb strings.Builder
 	for i := 0; i < 30; i++ {
 		sb.WriteString(strings.Repeat("x", 38) + "\n")
 	}
-	text := sb.String()
-
-	chunks := chunkTextWithOverlap(text, 500, 200)
+	chunks := chunkCode(sb.String(), 500)
 	if len(chunks) < 2 {
 		t.Fatalf("expected multiple chunks, got %d", len(chunks))
 	}
-	// Chunk 2 must start with the tail of chunk 1 (overlap on line boundary).
-	prev := chunks[0]
-	tail := prev
-	if len(tail) > 200 {
-		tail = tail[len(tail)-200:]
-		if nl := strings.Index(tail, "\n"); nl >= 0 {
-			tail = tail[nl+1:]
+	for i, c := range chunks {
+		if len(c) > 500 {
+			t.Errorf("chunk %d len %d exceeds maxChars", i, len(c))
 		}
 	}
-	if !strings.HasPrefix(chunks[1], tail) {
-		t.Errorf("chunk[1] does not start with overlap tail of chunk[0]")
+}
+
+// TestApplyOverlap verifies that consecutive chunks share trailing context
+// and that edge cases degrade gracefully.
+func TestApplyOverlap(t *testing.T) {
+	chunks := applyOverlap([]string{"aaa\nbbb", "ccc\nddd"}, 200)
+	if len(chunks) != 2 {
+		t.Fatalf("expected 2 chunks, got %d", len(chunks))
+	}
+	if chunks[1] != "aaa\nbbb\nccc\nddd" {
+		t.Errorf("chunk[1] = %q, want overlap-prefixed", chunks[1])
 	}
 
 	// Single-chunk input is returned unchanged.
-	single := chunkTextWithOverlap("short", 500, 200)
+	single := applyOverlap([]string{"short"}, 200)
 	if len(single) != 1 || single[0] != "short" {
 		t.Errorf("single-chunk input altered: %q", single)
 	}
 
-	// Zero overlap behaves exactly like chunkText.
-	plain := chunkText(text, 500)
-	zero := chunkTextWithOverlap(text, 500, 0)
-	if len(plain) != len(zero) {
-		t.Fatalf("overlap=0 changed chunk count: %d vs %d", len(zero), len(plain))
-	}
-	for i := range plain {
-		if plain[i] != zero[i] {
-			t.Fatalf("overlap=0 changed chunk %d", i)
-		}
+	// Zero overlap returns input unchanged.
+	in := []string{"a", "b"}
+	zero := applyOverlap(in, 0)
+	if len(zero) != 2 || zero[0] != "a" || zero[1] != "b" {
+		t.Errorf("overlap=0 altered input: %q", zero)
 	}
 }
 

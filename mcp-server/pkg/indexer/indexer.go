@@ -143,7 +143,7 @@ func (idx *Indexer) IndexProject(ctx context.Context, projectID, rootDir string)
 			return nil
 		}
 
-		chunks := chunkTextWithOverlap(string(content), idx.chunkSize, defaultOverlapChars)
+		chunks := applyOverlap(chunkCode(string(content), idx.chunkSize), defaultOverlapChars)
 		for i, chunk := range chunks {
 			docID := fmt.Sprintf("%s/%s#chunk%d", sourceDir, relPath, i)
 			contentHash := computeContentHash(chunk)
@@ -244,18 +244,78 @@ func (idx *Indexer) findStalePoints(ctx context.Context, projectID, sourceDir st
 // keeps both sides of the boundary searchable.
 const defaultOverlapChars = 200
 
-// chunkTextWithOverlap splits text like chunkText, then prepends up to
-// overlapChars of trailing context from the previous chunk (cut on a line
-// boundary) to every chunk after the first.
-func chunkTextWithOverlap(text string, maxChars, overlapChars int) []string {
-	raw := chunkText(text, maxChars)
-	if overlapChars <= 0 || len(raw) < 2 {
-		return raw
+// splitCodeBlocks splits text into blocks separated by blank lines.
+// Functions, classes, and paragraphs are usually separated by blank lines,
+// so block boundaries are much better chunk cut points than arbitrary lines.
+func splitCodeBlocks(text string) []string {
+	var blocks []string
+	var cur strings.Builder
+	flush := func() {
+		if cur.Len() > 0 {
+			blocks = append(blocks, cur.String())
+			cur.Reset()
+		}
 	}
-	out := make([]string, 0, len(raw))
-	for i, c := range raw {
+	for _, line := range strings.Split(text, "\n") {
+		if strings.TrimSpace(line) == "" {
+			flush()
+			continue
+		}
+		cur.WriteString(line)
+		cur.WriteString("\n")
+	}
+	flush()
+	return blocks
+}
+
+// chunkCode splits text into chunks of approximately maxChars, preferring cut
+// points at blank-line boundaries (which usually separate functions, classes,
+// or paragraphs in code). Blocks larger than maxChars fall back to line-based
+// splitting. This is a heuristic approximation of semantic chunking — true
+// AST-aware splitting is future work.
+func chunkCode(text string, maxChars int) []string {
+	if len(text) <= maxChars {
+		return []string{text}
+	}
+	var chunks []string
+	var cur strings.Builder
+	flush := func() {
+		if cur.Len() > 0 {
+			chunks = append(chunks, cur.String())
+			cur.Reset()
+		}
+	}
+	for _, block := range splitCodeBlocks(text) {
+		block = strings.TrimSuffix(block, "\n")
+		units := []string{block}
+		if len(block) > maxChars {
+			units = chunkText(block, maxChars)
+		}
+		for _, u := range units {
+			u = strings.TrimSuffix(u, "\n")
+			if cur.Len() > 0 && cur.Len()+1+len(u) > maxChars {
+				flush()
+			}
+			if cur.Len() > 0 {
+				cur.WriteString("\n")
+			}
+			cur.WriteString(u)
+		}
+	}
+	flush()
+	return chunks
+}
+
+// applyOverlap prepends up to overlapChars of trailing context from the
+// previous chunk (cut on a line boundary) to every chunk after the first.
+func applyOverlap(chunks []string, overlapChars int) []string {
+	if overlapChars <= 0 || len(chunks) < 2 {
+		return chunks
+	}
+	out := make([]string, 0, len(chunks))
+	for i, c := range chunks {
 		if i > 0 {
-			prev := raw[i-1]
+			prev := chunks[i-1]
 			tail := prev
 			if len(tail) > overlapChars {
 				tail = tail[len(tail)-overlapChars:]
@@ -264,7 +324,7 @@ func chunkTextWithOverlap(text string, maxChars, overlapChars int) []string {
 				}
 			}
 			if tail != "" {
-				c = tail + c
+				c = tail + "\n" + c
 			}
 		}
 		out = append(out, c)

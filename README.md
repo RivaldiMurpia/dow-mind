@@ -51,7 +51,7 @@ without you re-explaining them every time.
   (`project_<id>`), so an agent working in one repo never retrieves context
   leaked from another. Index a codebase once; query it in isolation.
 - **Retrieval that actually finds things.** Dense semantic search, optional
-  **hybrid** (dense + lexical RRF), **reranking** (Voyage `rerank-2.5`), and
+  **hybrid** (dense + lexical RRF), **reranking** (Voyage `rerank-2.5` or Cohere `rerank-v3.5` — pluggable, or `none`), and
   near-duplicate **compression** — tunable per query. See the ranked results,
   scores, and matched snippets live in the Playground.
 - **Persistent memory, durable metrics.** Design decisions and facts survive
@@ -197,6 +197,9 @@ When running in `--serve` mode, the following REST endpoints are available:
 | `GET` | `/api/projects/{id}/points` | List chunks (supports `?source_file=`, `?offset=`, `?limit=`) |
 | `DELETE` | `/api/projects/{id}/points/{pointId}` | Delete a single chunk |
 | `POST` | `/api/projects/{id}/reindex` | Re-index a project directory (body: `{"directory": "/path"}`) |
+| `POST` | `/api/projects/{id}/watch` | Index now + auto re-index on file changes (body: `{"directory": "/path"}`) |
+| `GET` | `/api/projects/{id}/watch` | Watch status (404 when not watched) |
+| `DELETE` | `/api/projects/{id}/watch` | Stop watching (indexed data is kept) |
 | `DELETE` | `/api/projects/{id}` | Delete a project collection |
 | `POST` | `/api/search` | Search (body: `{"project_id", "query", "k", "recall", "hybrid", "rerank", "compress"}`) |
 | `GET` | `/api/stats` | Aggregate stats (total projects, chunks, embed model) |
@@ -868,7 +871,10 @@ All configuration is via environment variables (or config file at `~/.dow-mind/c
 | `DOWMIND_OPENAI_MODEL` | *(empty)* | Embedding model name (required when `DOWMIND_EMBEDDER=openai`), e.g. `text-embedding-3-small`, `nomic-embed-text` |
 | `DOWMIND_OPENAI_DIM` | `0` | Output dimension for the OpenAI embedder. `0` = auto-detect; models like `text-embedding-3-*` honor an explicit value |
 | `DOWMIND_VECTOR_DIM` | `1024` | Embedding vector dimension (matches voyage-4 default). Override only if using a different model with a different dimension |
-| `DOWMIND_RERANKER_MODEL` | *(empty)* | Reranker model name (e.g., `rerank-2.5`). When set and `DOWMIND_VOYAGE_API_KEY` is available, reranking is enabled for search |
+| `DOWMIND_RERANKER` | `voyage` | Rerank backend: `voyage`, `cohere`, or `none` (disables reranking) |
+| `DOWMIND_RERANKER_MODEL` | *(empty)* | Voyage reranker model name (e.g., `rerank-2.5`). When set and `DOWMIND_VOYAGE_API_KEY` is available, reranking is enabled for search |
+| `DOWMIND_COHERE_API_KEY` | *(empty)* | Cohere API key (required when `DOWMIND_RERANKER=cohere`) |
+| `DOWMIND_COHERE_MODEL` | `rerank-v3.5` | Cohere rerank model name |
 | `DOWMIND_ADMIN_TOKEN` | *(empty)* | Optional admin token. When set, all `/api/*` endpoints require `Authorization: Bearer <token>` header. When unset, no auth is required |
 | `DOWMIND_CORS_ORIGIN` | *(empty)* | Optional CORS origin for the SSE event stream (`/api/events`). When set (e.g. `*` or `https://app.example.com`), it becomes the `Access-Control-Allow-Origin` header. When unset, no CORS header is sent and the stream stays same-origin only |
 
@@ -877,7 +883,9 @@ All configuration is via environment variables (or config file at `~/.dow-mind/c
 - `mind_create_project` — create a project collection
 - `mind_delete_project` — delete a project collection
 - `mind_index` — index individual documents into a project
-- `mind_index_project` — scan a directory and auto-index all code/text files. Handles insertions and deletions (removed files are purged from RAG). Skips node_modules, .git, vendor, dist, build.
+- `mind_index_project` — scan a directory and auto-index all code/text files. Handles insertions and deletions (removed files are purged from RAG). Skips node_modules, .git, vendor, dist, build. Respects the project's `.gitignore`. Never indexes secret files (`.env`, keys, certs).
+- `mind_watch_project` — index a directory now, then auto re-index (debounced) on file changes. Watches are in-memory (lost on restart).
+- `mind_unwatch_project` — stop watching a directory (indexed data is kept).
 - `mind_semantic_search` — semantic search across project memory
 - `mind_retrieve_context` — compact context string for LLM consumption
 

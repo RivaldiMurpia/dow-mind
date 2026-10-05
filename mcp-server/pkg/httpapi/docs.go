@@ -193,6 +193,9 @@ restricted to localhost or a valid `+"`DOWMIND_ADMIN_TOKEN`"+` bearer token.
 - `+"`GET /api/projects/{id}/points`"+` — list chunks (`+"`?source_file=&offset=&limit=`"+`)
 - `+"`DELETE /api/projects/{id}/points/{pointId}`"+` — delete one chunk
 - `+"`POST /api/projects/{id}/reindex`"+` — index a directory (`+"`{directory}`"+`)
+- `+"`POST /api/projects/{id}/watch`"+` — index now + auto re-index on file changes (`+"`{directory}`"+`)
+- `+"`GET /api/projects/{id}/watch`"+` — watch status
+- `+"`DELETE /api/projects/{id}/watch`"+` — stop watching (data kept)
 - `+"`DELETE /api/projects/{id}`"+` — delete a project
 - `+"`POST /api/search`"+` — search (`+"`{project_id, query, k, recall, hybrid, rerank, compress}`"+`)
 
