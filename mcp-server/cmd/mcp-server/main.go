@@ -219,7 +219,7 @@ func main() {
 	}
 
 	serve := flag.Bool("serve", false, "run HTTP+UI server instead of stdio MCP")
-	addr := flag.String("addr", ":7777", "HTTP listen address (only used with --serve)")
+	addr := flag.String("addr", "127.0.0.1:7777", "HTTP listen address (only used with --serve). Default binds localhost only; pass --addr :7777 (or 0.0.0.0:7777) to expose on the network — only do that with DOWMIND_ADMIN_TOKEN set.")
 	flag.Parse()
 
 	cfg, err := resolveConfig()
@@ -317,6 +317,10 @@ func runHTTP(svc *core.Service, addr string, cfg *RuntimeConfig) {
 	authNote := "open (no DOWMIND_ADMIN_TOKEN set)"
 	if os.Getenv("DOWMIND_ADMIN_TOKEN") != "" {
 		authNote = "requires Authorization: Bearer <DOWMIND_ADMIN_TOKEN>"
+	} else {
+		// Loud warning: an tokenless server is only safe while bound to
+		// localhost (the default). Never expose it to a network unprotected.
+		fmt.Fprintf(os.Stderr, "WARNING: DOWMIND_ADMIN_TOKEN is not set — the API is unauthenticated. This is only safe because the server binds 127.0.0.1 by default. Set DOWMIND_ADMIN_TOKEN before exposing it on any network interface.\n")
 	}
 	fmt.Fprintf(os.Stderr, "dow-mind HTTP server starting on %s: vector_store=%s embedder=%s; MCP at /mcp (%s)\n", addr, cfg.VectorStore, cfg.Embedder, authNote)
 	if err := http.ListenAndServe(addr, handler); err != nil {

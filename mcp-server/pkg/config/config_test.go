@@ -101,7 +101,7 @@ voyage:
   api_key: test-key-123
   model: voyage-4
   dim: 1024
-pgvector_dsn: "postgresql://RivaldiMurpia@localhost:5432/dowmindrag"
+pgvector_dsn: "postgresql://RivaldiMurpia@localhost:5432/dowmind"
 qdrant_url: "http://localhost:6333"
 qdrant_api_key: ""
 chroma_url: "http://localhost:8000"
@@ -133,8 +133,8 @@ reranker_model: "rerank-2.5"
 	if cfg.Voyage.Dim != 1024 {
 		t.Errorf("Voyage.Dim = %d, want %d", cfg.Voyage.Dim, 1024)
 	}
-	if cfg.PGVectorDSN != "postgresql://RivaldiMurpia@localhost:5432/dowmindrag" {
-		t.Errorf("PGVectorDSN = %q, want %q", cfg.PGVectorDSN, "postgresql://RivaldiMurpia@localhost:5432/dowmindrag")
+	if cfg.PGVectorDSN != "postgresql://RivaldiMurpia@localhost:5432/dowmind" {
+		t.Errorf("PGVectorDSN = %q, want %q", cfg.PGVectorDSN, "postgresql://RivaldiMurpia@localhost:5432/dowmind")
 	}
 	if cfg.QdrantURL != "http://localhost:6333" {
 		t.Errorf("QdrantURL = %q, want %q", cfg.QdrantURL, "http://localhost:6333")
@@ -190,7 +190,7 @@ func TestSave_CreatesDirectoryAndFile(t *testing.T) {
 			Model:  "voyage-4",
 			Dim:    1024,
 		},
-		PGVectorDSN: "postgresql://RivaldiMurpia@localhost:5432/dowmindrag",
+		PGVectorDSN: "postgresql://RivaldiMurpia@localhost:5432/dowmind",
 		QdrantURL:   "http://localhost:6333",
 	}
 
@@ -268,7 +268,7 @@ func TestRoundTrip_SaveThenLoad(t *testing.T) {
 		VectorStore:   "pgvector",
 		Embedder:      "voyage",
 		Voyage:        VoyageConfig{APIKey: "rt-key", Model: "voyage-4", Dim: 1024},
-		PGVectorDSN:   "postgresql://RivaldiMurpia@localhost:5432/dowmindrag",
+		PGVectorDSN:   "postgresql://RivaldiMurpia@localhost:5432/dowmind",
 		QdrantURL:     "http://localhost:6333",
 		QdrantAPIKey:  "qdrant-secret",
 		ChromaURL:     "http://localhost:8000",
@@ -307,7 +307,7 @@ voyage:
   api_key: file-key
   model: voyage-4
   dim: 1024
-pgvector_dsn: "postgresql://RivaldiMurpia@localhost:5432/dowmindrag"
+pgvector_dsn: "postgresql://RivaldiMurpia@localhost:5432/dowmind"
 qdrant_url: "http://localhost:6333"
 `
 	configPath := filepath.Join(configDir, "config.yaml")
@@ -532,7 +532,7 @@ func TestSave_OverwritesExisting(t *testing.T) {
 		VectorStore: "pgvector",
 		Embedder:    "voyage",
 		Voyage:      VoyageConfig{APIKey: "second-key", Model: "voyage-4", Dim: 1024},
-		PGVectorDSN: "postgresql://RivaldiMurpia@localhost:5432/dowmindrag",
+		PGVectorDSN: "postgresql://RivaldiMurpia@localhost:5432/dowmind",
 	}
 	if err := Save(cfg2); err != nil {
 		t.Fatalf("Save() second: %v", err)

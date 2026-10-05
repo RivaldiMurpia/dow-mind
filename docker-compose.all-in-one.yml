@@ -38,7 +38,7 @@ services:
       DOWMIND_QDRANT_URL: "http://qdrant:6333"
 
       # --- pgvector config (when DOWMIND_VECTOR_STORE=pgvector) ---
-      # DOWMIND_PGVECTOR_DSN: "postgresql://dowmindrag:dowmindrag@postgres:5432/dowmindrag"
+      # DOWMIND_PGVECTOR_DSN: "postgresql://dowmind:dowmind@postgres:5432/dowmind"
 
       # --- TEI config (when DOWMIND_EMBEDDER=tei) ---
       # DOWMIND_TEI_URL: "http://tei-embedding:80"
@@ -82,14 +82,14 @@ services:
   #   ports:
   #     - "5432:5432"
   #   environment:
-  #     POSTGRES_USER: dowmindrag
-  #     POSTGRES_PASSWORD: dowmindrag
-  #     POSTGRES_DB: dowmindrag
+  #     POSTGRES_USER: dowmind
+  #     POSTGRES_PASSWORD: dowmind
+  #     POSTGRES_DB: dowmind
   #   volumes:
   #     - postgres-data:/var/lib/postgresql/data
   #   restart: unless-stopped
   #   healthcheck:
-  #     test: ["CMD-SHELL", "pg_isready -U dowmindrag"]
+  #     test: ["CMD-SHELL", "pg_isready -U dowmind"]
   #     interval: 30s
   #     timeout: 10s
   #     retries: 3

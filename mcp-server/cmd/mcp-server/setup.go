@@ -91,7 +91,7 @@ func generateCompose(cfg *RuntimeConfig) string {
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_DB: dowmindrag
+      POSTGRES_DB: dowmind
       POSTGRES_USER: RivaldiMurpia
     volumes:
       - pgdata:/var/lib/postgresql/data`)

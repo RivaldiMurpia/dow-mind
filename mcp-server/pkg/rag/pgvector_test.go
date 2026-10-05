@@ -10,7 +10,7 @@ import (
 )
 
 // pgvectorDSN is the connection string for integration tests.
-const pgvectorDSN = "postgresql://RivaldiMurpia@localhost:5432/dowmindrag"
+const pgvectorDSN = "postgresql://RivaldiMurpia@localhost:5432/dowmind"
 
 // skipIfNoPostgres skips the test if PostgreSQL is not available.
 func skipIfNoPostgres(t *testing.T) {

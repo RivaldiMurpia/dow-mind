@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	gitignore "github.com/sabhiram/go-gitignore"
+
 	"github.com/RivaldiMurpia/dow-mind/pkg/rag"
 )
 
@@ -88,27 +90,48 @@ func (idx *Indexer) IndexProject(ctx context.Context, projectID, rootDir string)
 	var currentFiles []string
 	skipped := 0
 
+	// Compile the project's .gitignore (if any) so indexed files respect it.
+	// defaultIgnores still apply on top as a baseline.
+	var ignorer *gitignore.GitIgnore
+	if data, err := os.ReadFile(filepath.Join(rootDir, ".gitignore")); err == nil {
+		ignorer = gitignore.CompileIgnoreLines(strings.Split(string(data), "\n")...)
+	}
+
 	err = filepath.WalkDir(rootDir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil // skip errors
 		}
+		relPath, relErr := filepath.Rel(rootDir, path)
+		if relErr != nil {
+			return nil
+		}
+		relPath = filepath.ToSlash(relPath)
+
 		if d.IsDir() {
 			name := d.Name()
 			if defaultIgnores[name] {
 				return filepath.SkipDir
 			}
+			// Respect .gitignore for directories too (the trailing slash
+			// helps the matcher hit `dir/` patterns). Never skip root itself.
+			if ignorer != nil && relPath != "." && ignorer.MatchesPath(relPath+"/") {
+				return filepath.SkipDir
+			}
 			return nil
 		}
-		// Skip binary/irrelevant files
+		if ignorer != nil && ignorer.MatchesPath(relPath) {
+			return nil
+		}
+		// Skip binary/irrelevant files. Secret files are never indexed —
+		// this is checked before isIndexable so a permissive extension
+		// allowlist can never pull credentials in.
+		if isSecretFile(d.Name()) {
+			return nil
+		}
 		if !isIndexable(d.Name()) {
 			return nil
 		}
 
-		relPath, err := filepath.Rel(rootDir, path)
-		if err != nil {
-			return nil
-		}
-		relPath = filepath.ToSlash(relPath)
 		currentFiles = append(currentFiles, relPath)
 
 		content, err := os.ReadFile(path)
@@ -120,7 +143,7 @@ func (idx *Indexer) IndexProject(ctx context.Context, projectID, rootDir string)
 			return nil
 		}
 
-		chunks := chunkText(string(content), idx.chunkSize)
+		chunks := chunkTextWithOverlap(string(content), idx.chunkSize, defaultOverlapChars)
 		for i, chunk := range chunks {
 			docID := fmt.Sprintf("%s/%s#chunk%d", sourceDir, relPath, i)
 			contentHash := computeContentHash(chunk)
@@ -137,7 +160,7 @@ func (idx *Indexer) IndexProject(ctx context.Context, projectID, rootDir string)
 					"source_dir":    sourceDir,
 					"chunk_index":   fmt.Sprintf("%d", i),
 					"content_hash":  contentHash,
-					"chunk_version": "v2",
+					"chunk_version": "v3",
 				},
 			})
 		}
@@ -215,6 +238,40 @@ func (idx *Indexer) findStalePoints(ctx context.Context, projectID, sourceDir st
 	return stale, nil
 }
 
+// defaultOverlapChars is how many trailing characters of the previous chunk
+// are prepended to the next one. Retrieval quality drops when a concept is
+// split exactly at a chunk boundary with zero shared context; a small overlap
+// keeps both sides of the boundary searchable.
+const defaultOverlapChars = 200
+
+// chunkTextWithOverlap splits text like chunkText, then prepends up to
+// overlapChars of trailing context from the previous chunk (cut on a line
+// boundary) to every chunk after the first.
+func chunkTextWithOverlap(text string, maxChars, overlapChars int) []string {
+	raw := chunkText(text, maxChars)
+	if overlapChars <= 0 || len(raw) < 2 {
+		return raw
+	}
+	out := make([]string, 0, len(raw))
+	for i, c := range raw {
+		if i > 0 {
+			prev := raw[i-1]
+			tail := prev
+			if len(tail) > overlapChars {
+				tail = tail[len(tail)-overlapChars:]
+				if nl := strings.Index(tail, "\n"); nl >= 0 {
+					tail = tail[nl+1:]
+				}
+			}
+			if tail != "" {
+				c = tail + c
+			}
+		}
+		out = append(out, c)
+	}
+	return out
+}
+
 // chunkText splits text into chunks of approximately maxChars.
 // It tries to split on newline boundaries.
 func chunkText(text string, maxChars int) []string {
@@ -261,6 +318,47 @@ func computeContentHash(content string) string {
 	return hex.EncodeToString(h[:8])
 }
 
+// isSecretFile reports whether a file conventionally holds credentials and
+// must never be indexed, even if its extension looks indexable.
+// Template files (.env.example) are safe and explicitly allowed.
+func isSecretFile(name string) bool {
+	nameLower := strings.ToLower(name)
+
+	// .env and .env.<name> hold real secrets; only templates are allowed.
+	if nameLower == ".env.example" || nameLower == ".env.sample" || nameLower == ".env.template" {
+		return false
+	}
+	if nameLower == ".env" || strings.HasPrefix(nameLower, ".env.") {
+		return true
+	}
+
+	// Key/certificate stores and encrypted blobs.
+	switch strings.ToLower(filepath.Ext(name)) {
+	case ".pem", ".key", ".p12", ".pfx", ".jks", ".keystore", ".asc", ".gpg", ".age":
+		return true
+	}
+
+	// Basenames that are exactly (or start/end with) a secret token are
+	// skipped: the file is probably the secret itself. This is intentionally
+	// conservative — e.g. "credential_manager.go" is skipped too. Rename the
+	// file if you need it indexed.
+	base := strings.TrimSuffix(nameLower, strings.ToLower(filepath.Ext(nameLower)))
+	for _, s := range []string{"id_rsa", "id_dsa", "id_ecdsa", "id_ed25519", "credentials", "credential", "secrets", "secret"} {
+		for _, sep := range []string{".", "_", "-"} {
+			if base == s || strings.HasPrefix(base, s+sep) || strings.HasSuffix(base, sep+s) {
+				return true
+			}
+		}
+	}
+
+	// Dotfiles that conventionally carry tokens.
+	switch nameLower {
+	case ".npmrc", ".pypirc", ".netrc", "_netrc":
+		return true
+	}
+	return false
+}
+
 // isIndexable returns true for code and text files.
 func isIndexable(name string) bool {
 	ext := strings.ToLower(filepath.Ext(name))
@@ -272,7 +370,7 @@ func isIndexable(name string) bool {
 		".sql": true, ".sh": true, ".bash": true, ".zsh": true,
 		".yml": true, ".yaml": true, ".toml": true, ".json": true,
 		".xml": true, ".html": true, ".css": true, ".scss": true,
-		".md": true, ".txt": true, ".env": true, ".cfg": true,
+		".md": true, ".txt": true, ".cfg": true,
 		".ini": true, ".conf": true, ".dockerfile": true,
 		".proto": true, ".graphql": true, ".gql": true,
 	}
@@ -281,7 +379,8 @@ func isIndexable(name string) bool {
 	}
 	// Also index files without extension but with known names
 	nameLower := strings.ToLower(name)
-	if nameLower == "dockerfile" || nameLower == "makefile" || nameLower == "license" || nameLower == ".gitignore" {
+	if nameLower == "dockerfile" || nameLower == "makefile" || nameLower == "license" || nameLower == ".gitignore" ||
+		nameLower == ".env.example" || nameLower == ".env.sample" || nameLower == ".env.template" {
 		return true
 	}
 	return false

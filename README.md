@@ -182,7 +182,7 @@ DOWMIND_ADMIN_TOKEN=your-secret ./dow-mind --serve
 | Flag | Default | Description |
 | --- | --- | --- |
 | `--serve` | `false` | Run as HTTP server instead of stdio MCP |
-| `--addr` | `:7777` | HTTP listen address (only used with `--serve`) |
+| `--addr` | `127.0.0.1:7777` | HTTP listen address (only used with `--serve`). Binds localhost by default; pass `--addr :7777` to expose on the network (only with `DOWMIND_ADMIN_TOKEN` set) |
 
 ---
 

@@ -171,7 +171,7 @@ func TestSetupApply_SavesConfigWith0600(t *testing.T) {
 	p := &mockProvider{}
 	_, router := newTestServer(t, p, nil)
 
-	body := `{"vector_store":"pgvector","embedder":"voyage","voyage_api_key":"secret-key","voyage_model":"voyage-4","voyage_dim":1024,"pgvector_dsn":"postgresql://RivaldiMurpia@localhost:5432/dowmindrag"}`
+	body := `{"vector_store":"pgvector","embedder":"voyage","voyage_api_key":"secret-key","voyage_model":"voyage-4","voyage_dim":1024,"pgvector_dsn":"postgresql://RivaldiMurpia@localhost:5432/dowmind"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/setup/apply", strings.NewReader(body))
 	req.RemoteAddr = "127.0.0.1:12345"
 	req.Header.Set("Content-Type", "application/json")
@@ -215,7 +215,7 @@ func TestSetupApply_WritesValidYAML(t *testing.T) {
 	p := &mockProvider{}
 	_, router := newTestServer(t, p, nil)
 
-	body := `{"vector_store":"pgvector","embedder":"voyage","voyage_api_key":"my-key","voyage_model":"voyage-4","voyage_dim":1024,"pgvector_dsn":"postgresql://RivaldiMurpia@localhost:5432/dowmindrag","qdrant_url":"http://localhost:6333","reranker_model":"rerank-2.5"}`
+	body := `{"vector_store":"pgvector","embedder":"voyage","voyage_api_key":"my-key","voyage_model":"voyage-4","voyage_dim":1024,"pgvector_dsn":"postgresql://RivaldiMurpia@localhost:5432/dowmind","qdrant_url":"http://localhost:6333","reranker_model":"rerank-2.5"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/setup/apply", strings.NewReader(body))
 	req.RemoteAddr = "127.0.0.1:12345"
 	req.Header.Set("Content-Type", "application/json")
@@ -629,7 +629,7 @@ func TestParsePGDSN_URLFormat(t *testing.T) {
 		wantHost string
 		wantPort string
 	}{
-		{"postgresql://RivaldiMurpia@localhost:5432/dowmindrag", "localhost", "5432"},
+		{"postgresql://RivaldiMurpia@localhost:5432/dowmind", "localhost", "5432"},
 		{"postgresql://admin@db.example.com:6543/mydb", "db.example.com", "6543"},
 		{"postgres://localhost/mydb", "localhost", "5432"},
 		{"postgresql://localhost:5432", "localhost", "5432"},

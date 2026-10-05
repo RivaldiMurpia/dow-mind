@@ -23,7 +23,7 @@ export interface DraftConfig {
 
 export const defaultDraft: DraftConfig = {
   vectorStore: '',
-  pgvectorDSN: 'postgresql://RivaldiMurpia@localhost:5432/dowmindrag',
+  pgvectorDSN: 'postgresql://RivaldiMurpia@localhost:5432/dowmind',
   qdrantURL: 'http://localhost:6333',
   qdrantAPIKey: '',
   chromaURL: 'http://localhost:8000',
@@ -98,7 +98,7 @@ const SERVICE_BLOCKS: Record<string, string> = {
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_DB: dowmindrag
+      POSTGRES_DB: dowmind
       POSTGRES_USER: RivaldiMurpia
     volumes:
       - pgdata:/var/lib/postgresql/data`,
@@ -147,13 +147,13 @@ export function generateCommands(cfg: DraftConfig): string {
   if (names.includes('postgres')) {
     lines.push('')
     lines.push('# Verify pgvector extension')
-    lines.push('psql -h localhost -U RivaldiMurpia -d dowmindrag \\')
+    lines.push('psql -h localhost -U RivaldiMurpia -d dowmind \\')
     lines.push('  -c "CREATE EXTENSION IF NOT EXISTS vector;"')
   }
 
   lines.push('')
-  lines.push('# Start dow-mind server')
-  lines.push('./dow-mind --serve --addr :7777')
+  lines.push('# Start dow-mind server (binds 127.0.0.1 by default; set DOWMIND_ADMIN_TOKEN before exposing)')
+  lines.push('./dow-mind --serve')
 
   return lines.join('\n')
 }

@@ -520,7 +520,7 @@
         <label>Connection string / DSN</label>
         <div class="input">
           <svg viewBox="0 0 24 24"><path d="M12 2L2 7v10l10 5 10-5V7L12 2z"/><path d="M2 7l10 5 10-5M12 22V12"/></svg>
-          <span class="val">postgresql://RivaldiMurpia@localhost:5432/dowmindrag</span>
+          <span class="val">postgresql://RivaldiMurpia@localhost:5432/dowmind</span>
         </div>
       </div>
     </div>
@@ -651,7 +651,7 @@
         <span class="status-dot" style="background:var(--good)"></span>
         <div>
           <div class="comp-name">Vector Store <span class="mono">— pgvector</span></div>
-          <div class="msg">Connected to <code>postgresql://RivaldiMurpia@localhost:5432/dowmindrag</code>. pgvector extension confirmed.</div>
+          <div class="msg">Connected to <code>postgresql://RivaldiMurpia@localhost:5432/dowmind</code>. pgvector extension confirmed.</div>
         </div>
         <span class="latency ok">12ms</span>
       </div>
@@ -734,7 +734,7 @@
     <span class="kw">ports</span>:
       - <span class="str">"5432:5432"</span>
     <span class="kw">environment</span>:
-      POSTGRES_DB: <span class="str">dowmindrag</span>
+      POSTGRES_DB: <span class="str">dowmind</span>
       POSTGRES_USER: <span class="str">RivaldiMurpia</span>
     <span class="kw">volumes</span>:
       - pgdata:/var/lib/postgresql/data
@@ -752,7 +752,7 @@
 docker compose up -d postgres
 
 <span class="com"># Verify pgvector extension</span>
-psql -h localhost -U RivaldiMurpia -d dowmindrag \
+psql -h localhost -U RivaldiMurpia -d dowmind \
   -c <span class="str">"CREATE EXTENSION IF NOT EXISTS vector;"</span>
 
 <span class="com"># Start dow-mind server</span>
@@ -831,7 +831,7 @@ psql -h localhost -U RivaldiMurpia -d dowmindrag \
         </div>
         <div class="summary-row">
           <span class="sk">DSN</span>
-          <span class="sv">postgresql://RivaldiMurpia@localhost:5432/dowmindrag</span>
+          <span class="sv">postgresql://RivaldiMurpia@localhost:5432/dowmind</span>
         </div>
         <div class="summary-row">
           <span class="sk">Embedder</span>
