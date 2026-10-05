@@ -63,6 +63,13 @@ func (p *QdrantProvider) collectionName(projectID string) string {
 
 func (p *QdrantProvider) CreateCollection(ctx context.Context, projectID string) error {
 	name := p.collectionName(projectID)
+	// Idempotent, per the Provider contract ("creates the project collection
+	// if it doesn't exist"): a previous index run may have created the
+	// collection and then failed partway (e.g. embedder rate limit), so a
+	// retry must not 409.
+	if p.collectionExists(ctx, name) {
+		return nil
+	}
 	body := map[string]any{
 		"vectors": map[string]any{
 			"size":     p.vectorDim,
@@ -70,6 +77,22 @@ func (p *QdrantProvider) CreateCollection(ctx context.Context, projectID string)
 		},
 	}
 	return p.do(ctx, http.MethodPut, "/collections/"+name+"?wait=true", body, nil)
+}
+
+// collectionExists reports whether the named collection already exists.
+// Any uncertainty (network error, unexpected status) returns false so the
+// caller falls through to creation, which remains the source of truth.
+func (p *QdrantProvider) collectionExists(ctx context.Context, name string) bool {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, p.baseURL+"/collections/"+name, nil)
+	if err != nil {
+		return false
+	}
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	return resp.StatusCode == http.StatusOK
 }
 
 func (p *QdrantProvider) DeleteCollection(ctx context.Context, projectID string) error {
