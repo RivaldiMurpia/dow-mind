@@ -1,6 +1,6 @@
 // Package cloud provides connectors that read documents (text stored in
 // metadata) from external cloud vector databases, exposing them as rag.Exporter
-// so the migration engine can re-embed them into enowx-rag.
+// so the migration engine can re-embed them into dow-mind.
 //
 // Verification status:
 //   - Qdrant Cloud: uses the same rag.QdrantProvider pointed at a remote URL,
@@ -16,7 +16,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/enowdev/enowx-rag/pkg/rag"
+	"github.com/RivaldiMurpia/dow-mind/pkg/rag"
 )
 
 // Source identifies an external vector DB and where to read text from.
@@ -26,7 +26,7 @@ type Source struct {
 	APIKey   string
 	Index    string // index / collection / class name
 	// TextField is the metadata key that holds the chunk text. Defaults to
-	// "content" (what enowx-rag itself stores); vendors differ, so it's tunable.
+	// "content" (what dow-mind itself stores); vendors differ, so it's tunable.
 	TextField string
 }
 
@@ -46,9 +46,9 @@ func NewExporter(ctx context.Context, s Source) (rag.Exporter, error) {
 	case "qdrant":
 		// Reuse the fully-tested Qdrant provider against the remote URL. Its
 		// ExportPoints reads payload["content"] and doc_id, which matches how
-		// enowx-rag itself stores data; for foreign Qdrant collections with a
+		// dow-mind itself stores data; for foreign Qdrant collections with a
 		// different text field, PineconeExporter-style mapping would be needed,
-		// but the common case (Qdrant Cloud holding enowx-rag data) works.
+		// but the common case (Qdrant Cloud holding dow-mind data) works.
 		p, err := rag.NewQdrantProvider(ctx, s.URL, s.APIKey, noopEmbedder{})
 		if err != nil {
 			return nil, err

@@ -1,16 +1,16 @@
-# enowx-rag skill
+# dow-mind skill
 
-Use this skill when the user wants to set up, configure, or deploy the enowx-rag MCP server and RAG backend.
+Use this skill when the user wants to set up, configure, or deploy the dow-mind MCP server and RAG backend.
 
 ## When to use
 
-- User says "setup RAG memory", "install enowx-rag", "buat project RAG", "buat MCP RAG", "connect RAG", "rag per project", or similar.
+- User says "setup RAG memory", "install dow-mind", "buat project RAG", "buat MCP RAG", "connect RAG", "rag per project", or similar.
 - User asks about configuring a Model Context Protocol (MCP) server for project memory.
 - User wants to deploy the RAG backend locally or connect to an existing Coolify RAG stack.
 
 ## Goal
 
-Walk the user through installing the `enowx-rag` MCP server and optionally deploying or connecting the vector store + embedding backend.
+Walk the user through installing the `dow-mind` MCP server and optionally deploying or connecting the vector store + embedding backend.
 
 ## Constraints
 
@@ -22,7 +22,7 @@ Walk the user through installing the `enowx-rag` MCP server and optionally deplo
 ## Setup flow
 
 1. **Detect context**
-   - Check if the user already has a clone of `enowx-rag`.
+   - Check if the user already has a clone of `dow-mind`.
    - **Ask which embedding option they prefer:**
      - **Voyage AI (recommended):** Hosted API, no GPU needed. Free at [voyageai.com](https://voyageai.com) — `voyage-4` has 200M free tokens. Ask for their API key.
      - **Self-hosted TEI:** Runs locally via Docker. Ask if they already have Qdrant + TEI running, or offer to start them.
@@ -48,7 +48,7 @@ Walk the user through installing the `enowx-rag` MCP server and optionally deplo
 
 Ask these questions one at a time or in a compact batch:
 
-1. `project_path` - Where should the `enowx-rag` repository be created/cloned? (default: `/Users/enowdev/Project/enowx-rag`)
+1. `project_path` - Where should the `dow-mind` repository be created/cloned? (default: `~/Project/dow-mind`)
 2. `embedder` - Which embedding option?
    - **`voyage`** (default, recommended): hosted API, free at voyageai.com. Ask for `voyage_api_key`.
    - **`tei`**: self-hosted. Ask for Qdrant URL + TEI URL, or offer Docker setup.
@@ -67,8 +67,8 @@ Ask these questions one at a time or in a compact batch:
 
 ## Output artifacts
 
-- `enowx-rag/.env`
-- `enowx-rag/mcp-server/docker-compose.yml` (only for local mode, with chosen model)
+- `dow-mind/.env`
+- `dow-mind/mcp-server/docker-compose.yml` (only for local mode, with chosen model)
 - MCP client config snippet (correct format per tool)
 - Verification commands
 - `AGENTS.md` and `CLAUDE.md` in the target project (if requested)
@@ -76,20 +76,20 @@ Ask these questions one at a time or in a compact batch:
 ## Example `.env` (Voyage AI — recommended)
 
 ```bash
-RAG_VECTOR_STORE=qdrant
-RAG_QDRANT_URL=http://localhost:6333
-RAG_VOYAGE_API_KEY=your-voyage-api-key
-RAG_VOYAGE_MODEL=voyage-4
+DOWMIND_VECTOR_STORE=qdrant
+DOWMIND_QDRANT_URL=http://localhost:6333
+DOWMIND_VOYAGE_API_KEY=your-voyage-api-key
+DOWMIND_VOYAGE_MODEL=voyage-4
 ```
 
 ## Example `.env` (self-hosted TEI)
 
 ```bash
-RAG_VECTOR_STORE=qdrant
-RAG_EMBEDDER=tei
-RAG_QDRANT_URL=http://localhost:6333
-RAG_TEI_URL=http://localhost:8081
-RAG_MODEL_ID=BAAI/bge-small-en-v1.5
+DOWMIND_VECTOR_STORE=qdrant
+DOWMIND_EMBEDDER=tei
+DOWMIND_QDRANT_URL=http://localhost:6333
+DOWMIND_TEI_URL=http://localhost:8081
+DOWMIND_MODEL_ID=BAAI/bge-small-en-v1.5
 ```
 
 ## Example docker-compose.yml (local, with chosen model)
@@ -98,7 +98,7 @@ RAG_MODEL_ID=BAAI/bge-small-en-v1.5
 services:
   qdrant:
     image: qdrant/qdrant:latest
-    container_name: enowx-rag-qdrant
+    container_name: dow-mind-qdrant
     ports:
       - "6333:6333"
       - "6334:6334"
@@ -113,11 +113,11 @@ services:
 
   tei-embedding:
     image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.7
-    container_name: enowx-rag-tei
+    container_name: dow-mind-tei
     ports:
       - "8081:80"
     environment:
-      - MODEL_ID=${RAG_MODEL_ID:-BAAI/bge-small-en-v1.5}
+      - MODEL_ID=${DOWMIND_MODEL_ID:-BAAI/bge-small-en-v1.5}
       - RUST_LOG=info
       - MAX_BATCH_TOKENS=16384
     volumes:
@@ -140,7 +140,7 @@ volumes:
 
 Each tool has a different config format and file location. Use these exact formats.
 
-Each config block below shows the Voyage AI setup (recommended). Replace with `RAG_EMBEDDER=tei` + `RAG_TEI_URL` if using self-hosted TEI instead.
+Each config block below shows the Voyage AI setup (recommended). Replace with `DOWMIND_EMBEDDER=tei` + `DOWMIND_TEI_URL` if using self-hosted TEI instead.
 
 ### Claude Code (Anthropic CLI)
 
@@ -148,24 +148,24 @@ Each config block below shows the Voyage AI setup (recommended). Replace with `R
 
 **CLI command:**
 ```bash
-claude mcp add --transport stdio enowx-rag \
-  --env RAG_VECTOR_STORE=qdrant \
-  --env RAG_QDRANT_URL=http://localhost:6333 \
-  --env RAG_VOYAGE_API_KEY=your-voyage-api-key \
-  -- /Users/enowdev/Project/enowx-rag/mcp-server/mcp-server
+claude mcp add --transport stdio dow-mind \
+  --env DOWMIND_VECTOR_STORE=qdrant \
+  --env DOWMIND_QDRANT_URL=http://localhost:6333 \
+  --env DOWMIND_VOYAGE_API_KEY=your-voyage-api-key \
+  -- ~/Project/dow-mind/mcp-server/mcp-server
 ```
 
 **JSON format (`.mcp.json` or `~/.claude.json`):**
 ```json
 {
   "mcpServers": {
-    "enowx-rag": {
-      "command": "/Users/enowdev/Project/enowx-rag/mcp-server/mcp-server",
+    "dow-mind": {
+      "command": "~/Project/dow-mind/mcp-server/mcp-server",
       "env": {
-        "RAG_VECTOR_STORE": "qdrant",
-        "RAG_QDRANT_URL": "http://localhost:6333",
-        "RAG_VOYAGE_API_KEY": "your-voyage-api-key",
-        "RAG_VOYAGE_MODEL": "voyage-4"
+        "DOWMIND_VECTOR_STORE": "qdrant",
+        "DOWMIND_QDRANT_URL": "http://localhost:6333",
+        "DOWMIND_VOYAGE_API_KEY": "your-voyage-api-key",
+        "DOWMIND_VOYAGE_MODEL": "voyage-4"
       }
     }
   }
@@ -181,13 +181,13 @@ Source: https://code.claude.com/docs/en/mcp
 ```json
 {
   "mcpServers": {
-    "enowx-rag": {
-      "command": "/Users/enowdev/Project/enowx-rag/mcp-server/mcp-server",
+    "dow-mind": {
+      "command": "~/Project/dow-mind/mcp-server/mcp-server",
       "env": {
-        "RAG_VECTOR_STORE": "qdrant",
-        "RAG_QDRANT_URL": "http://localhost:6333",
-        "RAG_VOYAGE_API_KEY": "your-voyage-api-key",
-        "RAG_VOYAGE_MODEL": "voyage-4"
+        "DOWMIND_VECTOR_STORE": "qdrant",
+        "DOWMIND_QDRANT_URL": "http://localhost:6333",
+        "DOWMIND_VOYAGE_API_KEY": "your-voyage-api-key",
+        "DOWMIND_VOYAGE_MODEL": "voyage-4"
       }
     }
   }
@@ -204,13 +204,13 @@ Source: https://code.claude.com/docs/en/mcp-quickstart
 ```json
 {
   "mcpServers": {
-    "enowx-rag": {
-      "command": "/Users/enowdev/Project/enowx-rag/mcp-server/mcp-server",
+    "dow-mind": {
+      "command": "~/Project/dow-mind/mcp-server/mcp-server",
       "env": {
-        "RAG_VECTOR_STORE": "qdrant",
-        "RAG_QDRANT_URL": "http://localhost:6333",
-        "RAG_VOYAGE_API_KEY": "your-voyage-api-key",
-        "RAG_VOYAGE_MODEL": "voyage-4"
+        "DOWMIND_VECTOR_STORE": "qdrant",
+        "DOWMIND_QDRANT_URL": "http://localhost:6333",
+        "DOWMIND_VOYAGE_API_KEY": "your-voyage-api-key",
+        "DOWMIND_VOYAGE_MODEL": "voyage-4"
       },
       "disabled": false,
       "autoApprove": []
@@ -229,14 +229,14 @@ Source: https://docs.cline.bot/mcp/configuring-mcp-servers
 ```json
 {
   "mcpServers": {
-    "enowx-rag": {
+    "dow-mind": {
       "type": "stdio",
-      "command": "/Users/enowdev/Project/enowx-rag/mcp-server/mcp-server",
+      "command": "~/Project/dow-mind/mcp-server/mcp-server",
       "env": {
-        "RAG_VECTOR_STORE": "qdrant",
-        "RAG_QDRANT_URL": "http://localhost:6333",
-        "RAG_VOYAGE_API_KEY": "your-voyage-api-key",
-        "RAG_VOYAGE_MODEL": "voyage-4"
+        "DOWMIND_VECTOR_STORE": "qdrant",
+        "DOWMIND_QDRANT_URL": "http://localhost:6333",
+        "DOWMIND_VOYAGE_API_KEY": "your-voyage-api-key",
+        "DOWMIND_VOYAGE_MODEL": "voyage-4"
       }
     }
   }
@@ -257,15 +257,15 @@ OpenCode uses a different schema: `mcp` key (not `mcpServers`), `command` as arr
 {
   "$schema": "https://opencode.ai/config.json",
   "mcp": {
-    "enowx-rag": {
+    "dow-mind": {
       "type": "local",
-      "command": ["/Users/enowdev/Project/enowx-rag/mcp-server/mcp-server"],
+      "command": ["~/Project/dow-mind/mcp-server/mcp-server"],
       "enabled": true,
       "environment": {
-        "RAG_VECTOR_STORE": "qdrant",
-        "RAG_QDRANT_URL": "http://localhost:6333",
-        "RAG_VOYAGE_API_KEY": "your-voyage-api-key",
-        "RAG_VOYAGE_MODEL": "voyage-4"
+        "DOWMIND_VECTOR_STORE": "qdrant",
+        "DOWMIND_QDRANT_URL": "http://localhost:6333",
+        "DOWMIND_VOYAGE_API_KEY": "your-voyage-api-key",
+        "DOWMIND_VOYAGE_MODEL": "voyage-4"
       }
     }
   }
@@ -280,23 +280,23 @@ Source: https://opencode.ai/docs/mcp-servers/
 
 **CLI command:**
 ```bash
-codex mcp add enowx-rag \
-  --env RAG_VECTOR_STORE=qdrant \
-  --env RAG_QDRANT_URL=http://localhost:6333 \
-  --env RAG_VOYAGE_API_KEY=your-voyage-api-key \
-  -- /Users/enowdev/Project/enowx-rag/mcp-server/mcp-server
+codex mcp add dow-mind \
+  --env DOWMIND_VECTOR_STORE=qdrant \
+  --env DOWMIND_QDRANT_URL=http://localhost:6333 \
+  --env DOWMIND_VOYAGE_API_KEY=your-voyage-api-key \
+  -- ~/Project/dow-mind/mcp-server/mcp-server
 ```
 
 **TOML format (`config.toml`):**
 ```toml
-[mcp_servers.enowx-rag]
-command = "/Users/enowdev/Project/enowx-rag/mcp-server/mcp-server"
+[mcp_servers.dow-mind]
+command = "~/Project/dow-mind/mcp-server/mcp-server"
 
-[mcp_servers.enowx-rag.env]
-RAG_VECTOR_STORE = "qdrant"
-RAG_QDRANT_URL = "http://localhost:6333"
-RAG_VOYAGE_API_KEY = "your-voyage-api-key"
-RAG_VOYAGE_MODEL = "voyage-4"
+[mcp_servers.dow-mind.env]
+DOWMIND_VECTOR_STORE = "qdrant"
+DOWMIND_QDRANT_URL = "http://localhost:6333"
+DOWMIND_VOYAGE_API_KEY = "your-voyage-api-key"
+DOWMIND_VOYAGE_MODEL = "voyage-4"
 ```
 
 Source: https://developers.openai.com/codex/mcp
@@ -305,7 +305,7 @@ Source: https://developers.openai.com/codex/mcp
 
 **CLI command:**
 ```bash
-droid mcp add enowx-rag /Users/enowdev/Project/enowx-rag/mcp-server/mcp-server
+droid mcp add dow-mind ~/Project/dow-mind/mcp-server/mcp-server
 ```
 
 Source: Factory Droid CLI documentation
@@ -318,13 +318,13 @@ Source: Factory Droid CLI documentation
 ```json
 {
   "mcpServers": {
-    "enowx-rag": {
-      "command": "/Users/enowdev/Project/enowx-rag/mcp-server/mcp-server",
+    "dow-mind": {
+      "command": "~/Project/dow-mind/mcp-server/mcp-server",
       "env": {
-        "RAG_VECTOR_STORE": "qdrant",
-        "RAG_QDRANT_URL": "http://localhost:6333",
-        "RAG_VOYAGE_API_KEY": "your-voyage-api-key",
-        "RAG_VOYAGE_MODEL": "voyage-4"
+        "DOWMIND_VECTOR_STORE": "qdrant",
+        "DOWMIND_QDRANT_URL": "http://localhost:6333",
+        "DOWMIND_VOYAGE_API_KEY": "your-voyage-api-key",
+        "DOWMIND_VOYAGE_MODEL": "voyage-4"
       },
       "alwaysAllow": [],
       "disabled": false
@@ -342,14 +342,14 @@ Source: https://docs.roocode.com/features/mcp/using-mcp-in-roo
 ```json
 {
   "context_servers": {
-    "enowx-rag": {
-      "command": "/Users/enowdev/Project/enowx-rag/mcp-server/mcp-server",
+    "dow-mind": {
+      "command": "~/Project/dow-mind/mcp-server/mcp-server",
       "args": [],
       "env": {
-        "RAG_VECTOR_STORE": "qdrant",
-        "RAG_QDRANT_URL": "http://localhost:6333",
-        "RAG_VOYAGE_API_KEY": "your-voyage-api-key",
-        "RAG_VOYAGE_MODEL": "voyage-4"
+        "DOWMIND_VECTOR_STORE": "qdrant",
+        "DOWMIND_QDRANT_URL": "http://localhost:6333",
+        "DOWMIND_VOYAGE_API_KEY": "your-voyage-api-key",
+        "DOWMIND_VOYAGE_MODEL": "voyage-4"
       }
     }
   }
@@ -367,13 +367,13 @@ Source: https://zed.dev/docs/ai/mcp
 ```json
 {
   "mcpServers": {
-    "enowx-rag": {
-      "command": "/Users/enowdev/Project/enowx-rag/mcp-server/mcp-server",
+    "dow-mind": {
+      "command": "~/Project/dow-mind/mcp-server/mcp-server",
       "env": {
-        "RAG_VECTOR_STORE": "qdrant",
-        "RAG_QDRANT_URL": "http://localhost:6333",
-        "RAG_VOYAGE_API_KEY": "your-voyage-api-key",
-        "RAG_VOYAGE_MODEL": "voyage-4"
+        "DOWMIND_VECTOR_STORE": "qdrant",
+        "DOWMIND_QDRANT_URL": "http://localhost:6333",
+        "DOWMIND_VOYAGE_API_KEY": "your-voyage-api-key",
+        "DOWMIND_VOYAGE_MODEL": "voyage-4"
       }
     }
   }
@@ -392,13 +392,13 @@ Continue uses a `mcpServers` list (array of objects, not a map). Each entry has 
 
 ```yaml
 mcpServers:
-  - name: enowx-rag
-    command: /Users/enowdev/Project/enowx-rag/mcp-server/mcp-server
+  - name: dow-mind
+    command: ~/Project/dow-mind/mcp-server/mcp-server
     env:
-      RAG_VECTOR_STORE: qdrant
-      RAG_QDRANT_URL: http://localhost:6333
-      RAG_VOYAGE_API_KEY: your-voyage-api-key
-      RAG_VOYAGE_MODEL: voyage-4
+      DOWMIND_VECTOR_STORE: qdrant
+      DOWMIND_QDRANT_URL: http://localhost:6333
+      DOWMIND_VOYAGE_API_KEY: your-voyage-api-key
+      DOWMIND_VOYAGE_MODEL: voyage-4
 ```
 
 Source: https://docs.continue.dev/reference (see `mcpServers` section)
@@ -437,7 +437,7 @@ These files remind every AI coding assistant to consult project memory before an
 If `AGENTS.md` or `CLAUDE.md` already exists in the target project, **append the RAG section to the existing content**. Do not overwrite the file. Follow these steps:
 
 1. Read the existing file.
-2. Check if an `enowx-rag` or `RAG memory` section already exists. If so, update it in place.
+2. Check if an `dow-mind` or `RAG memory` section already exists. If so, update it in place.
 3. If no RAG section exists, append the template content below the existing content, separated by a `---` divider.
 4. Preserve all existing instructions, rules, and project-specific content.
 
@@ -446,7 +446,7 @@ If `AGENTS.md` or `CLAUDE.md` already exists in the target project, **append the
 Each project gets its own isolated collection in the vector store. The collection name is `project_<project_id>`. When setting up a new project:
 
 1. Derive the `PROJECT_ID` from the project folder name, repo name, or ask the user.
-2. Call `rag_create_project` with the project ID to create the collection. This is safe to call even if the collection already exists.
+2. Call `mind_create_project` with the project ID to create the collection. This is safe to call even if the collection already exists.
 3. Multiple projects can share the same MCP server instance and backend. Each project's memory is isolated by collection name.
 4. Never mix project memories. Always use the correct `PROJECT_ID` when indexing or retrieving.
 
@@ -455,19 +455,19 @@ Each project gets its own isolated collection in the vector store. The collectio
 ```markdown
 # Project agent instructions
 
-This project uses `enowx-rag` MCP server for per-project memory (RAG).
+This project uses `dow-mind` MCP server for per-project memory (RAG).
 
 ## Before you start coding
 
-1. Call `rag_retrieve_context` with the user's task/query and the project ID `PROJECT_ID`.
+1. Call `mind_retrieve_context` with the user's task/query and the project ID `PROJECT_ID`.
 2. Read the returned context. If it is empty or irrelevant, continue as normal.
 3. If the context changes how you would approach the task, explain the relevant insights briefly.
 
 ## After you finish coding
 
 1. Summarize what you changed and why.
-2. Call `rag_index` with useful new facts, design decisions, gotchas, or patterns under project ID `PROJECT_ID`.
-3. Call `rag_index_project` with the project directory to sync all file changes into RAG. Always do this — it handles new files, edits, and deletions automatically.
+2. Call `mind_index` with useful new facts, design decisions, gotchas, or patterns under project ID `PROJECT_ID`.
+3. Call `mind_index_project` with the project directory to sync all file changes into RAG. Always do this — it handles new files, edits, and deletions automatically.
 4. Keep chunks focused and concise (one idea per chunk). Include metadata tags when helpful.
 
 ## Project ID
@@ -503,21 +503,21 @@ Use project ID: `PROJECT_ID`
 ```markdown
 # Claude instructions for this project
 
-You are working with a project that has an `enowx-rag` MCP server installed.
+You are working with a project that has an `dow-mind` MCP server installed.
 
 ## RAG memory workflow
 
 ### Before making significant changes
 
-1. Call `rag_retrieve_context` with the project ID `PROJECT_ID` and the user's query.
+1. Call `mind_retrieve_context` with the project ID `PROJECT_ID` and the user's query.
 2. Read the returned context. If it is empty or irrelevant, continue as normal.
 3. If the context changes how you would approach the task, explain the relevant insights briefly.
 
 ### After completing work
 
 1. Summarize what you changed and why.
-2. Call `rag_index` with useful new facts, design decisions, gotchas, or patterns under project ID `PROJECT_ID`.
-3. Call `rag_index_project` with the project directory to sync all file changes into RAG. Always do this — it handles new files, edits, and deletions automatically.
+2. Call `mind_index` with useful new facts, design decisions, gotchas, or patterns under project ID `PROJECT_ID`.
+3. Call `mind_index_project` with the project directory to sync all file changes into RAG. Always do this — it handles new files, edits, and deletions automatically.
 4. Keep chunks focused and concise (one idea per chunk). Include metadata tags when helpful.
 
 ## Project ID
@@ -574,7 +574,7 @@ When generating these files, also remind the user to:
 After running the skill, produce a summary like this:
 
 ```markdown
-## enowx-rag setup complete
+## dow-mind setup complete
 
 ### Backend
 - Vector store: qdrant
@@ -600,7 +600,7 @@ Created:
 - `/path/to/project/CLAUDE.md`
 
 ### Next steps
-1. Build MCP server: `cd /Users/enowdev/Project/enowx-rag/mcp-server && go build ./cmd/mcp-server`
+1. Build MCP server: `cd ~/Project/dow-mind/mcp-server && go build ./cmd/mcp-server`
 2. Restart your coding tool or reload MCP server list.
 3. Test by asking the agent to retrieve project context.
 ```
@@ -617,12 +617,12 @@ curl -f http://localhost:6333/healthz
 curl -f http://localhost:8081/health
 
 # Build MCP server
-cd /Users/enowdev/Project/enowx-rag/mcp-server && go build ./cmd/mcp-server
+cd ~/Project/dow-mind/mcp-server && go build ./cmd/mcp-server
 ```
 
 ## Notes
 
 - The MCP server uses stdio transport by default.
 - Each project gets its own collection/index: `project_<project_id>`.
-- Default embedder is `voyage-4` (Voyage AI). Falls back to TEI if `RAG_VOYAGE_API_KEY` is not set and `RAG_EMBEDDER` is not specified.
+- Default embedder is `voyage-4` (Voyage AI). Falls back to TEI if `DOWMIND_VOYAGE_API_KEY` is not set and `DOWMIND_EMBEDDER` is not specified.
 - `AGENTS.md` and `CLAUDE.md` are opt-in: generate them only when the user says yes or asks to enable "always use RAG memory for this project".

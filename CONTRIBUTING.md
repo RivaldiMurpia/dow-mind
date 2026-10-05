@@ -1,6 +1,6 @@
-# Contributing to enowx-rag
+# Contributing to dow-mind
 
-Thanks for your interest in improving **enowx-rag** — a per-project RAG memory
+Thanks for your interest in improving **dow-mind** — a per-project RAG memory
 skill and MCP server for AI coding agents. Contributions of all sizes are
 welcome, from typo fixes to new vector-store providers.
 
@@ -22,8 +22,8 @@ The server is a Go module under `mcp-server/` with an embedded React SPA under
 ```bash
 # Prerequisites: Go 1.26+, Node 20+, (optional) Docker for local Qdrant/TEI
 
-git clone https://github.com/enowdev/enowx-rag.git
-cd enowx-rag/mcp-server
+git clone https://github.com/RivaldiMurpia/dow-mind.git
+cd dow-mind/mcp-server
 
 # Build everything (frontend + Go binary)
 make build          # from repo root: builds web/dist then the binary
@@ -37,9 +37,9 @@ To run the server with the web dashboard locally:
 ```bash
 # Local backend (no API key needed)
 docker compose up -d qdrant tei-embedding
-RAG_VECTOR_STORE=qdrant RAG_EMBEDDER=tei \
-  RAG_QDRANT_URL=http://localhost:6333 RAG_TEI_URL=http://localhost:8081 \
-  ./enowx-rag --serve
+DOWMIND_VECTOR_STORE=qdrant DOWMIND_EMBEDDER=tei \
+  DOWMIND_QDRANT_URL=http://localhost:6333 DOWMIND_TEI_URL=http://localhost:8081 \
+  ./dow-mind --serve
 
 # then open http://localhost:7777
 ```

@@ -30,7 +30,7 @@ jobs:
       - name: Create web/dist placeholder
         run: |
           mkdir -p web/dist
-          echo '<!doctype html><title>enowx-rag</title>' > web/dist/index.html
+          echo '<!doctype html><title>dow-mind</title>' > web/dist/index.html
 
       - name: go vet
         run: go vet ./...

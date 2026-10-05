@@ -1,5 +1,5 @@
 name: Feature request
-description: Suggest an idea or improvement for enowx-rag
+description: Suggest an idea or improvement for dow-mind
 labels: ["enhancement"]
 body:
   - type: textarea

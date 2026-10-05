@@ -48,7 +48,7 @@ export function Setup() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--good)', fontSize: '13px' }}>
                 <CheckCircle2 size={16} />
-                Configured — config file exists at ~/.enowx-rag/config.yaml
+                Configured — config file exists at ~/.dow-mind/config.yaml
               </div>
               <button className="btn primary" onClick={() => setShowWizard(true)}>
                 Reconfigure

@@ -30,7 +30,7 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Set this secret to publish the Homebrew formula to enowdev/homebrew-tap.
+          # Set this secret to publish the Homebrew formula to RivaldiMurpia/homebrew-tap.
           # If it's absent the brew step fails; remove the `brews:` block in
           # .goreleaser.yaml (or add the secret) to make the release green.
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}

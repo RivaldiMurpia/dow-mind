@@ -5,11 +5,11 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/enowdev/enowx-rag/pkg/config"
+	"github.com/RivaldiMurpia/dow-mind/pkg/config"
 )
 
 // AdminTokenMiddleware returns an HTTP middleware that protects /api/* and /mcp
-// with a shared admin token. The effective token is RAG_ADMIN_TOKEN if set,
+// with a shared admin token. The effective token is DOWMIND_ADMIN_TOKEN if set,
 // otherwise the value saved in config.yaml (config.EffectiveAdminToken). It is
 // read per-request so a token generated at runtime takes effect immediately.
 // When there is no token, the middleware is a no-op (no auth).
@@ -35,9 +35,9 @@ func AdminTokenMiddleware(next http.Handler) http.Handler {
 }
 
 // LocalOrAdminMiddleware protects sensitive write endpoints (e.g. the setup
-// wizard, which writes ~/.enowx-rag/config.yaml containing API keys). The
+// wizard, which writes ~/.dow-mind/config.yaml containing API keys). The
 // request is allowed when it originates from loopback (the common local-first
-// case) OR carries a valid RAG_ADMIN_TOKEN. A remote request without the token
+// case) OR carries a valid DOWMIND_ADMIN_TOKEN. A remote request without the token
 // is rejected, so an exposed instance cannot have its config rewritten or its
 // secrets probed by anonymous callers.
 func LocalOrAdminMiddleware(next http.Handler) http.Handler {

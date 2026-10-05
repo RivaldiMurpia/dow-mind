@@ -120,7 +120,7 @@ export function StepDone({ cfg, onBack, onComplete }: StepDoneProps) {
           )}
           <div className="summary-row">
             <span className="sk">Config path</span>
-            <span className="sv mono">~/.enowx-rag/config.yaml</span>
+            <span className="sv mono">~/.dow-mind/config.yaml</span>
           </div>
           <div className="summary-row">
             <span className="sk">Permissions</span>
@@ -147,7 +147,7 @@ export function StepDone({ cfg, onBack, onComplete }: StepDoneProps) {
               <div>
                 <div className="confirm-title">Configuration already exists</div>
                 <div className="confirm-desc">
-                  A config file already exists at <code className="mono">~/.enowx-rag/config.yaml</code>. Saving will
+                  A config file already exists at <code className="mono">~/.dow-mind/config.yaml</code>. Saving will
                   replace the existing configuration. Do you want to continue?
                 </div>
               </div>

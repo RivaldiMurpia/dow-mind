@@ -10,7 +10,7 @@ import (
 )
 
 // pgvectorDSN is the connection string for integration tests.
-const pgvectorDSN = "postgresql://enowdev@localhost:5432/enowxrag"
+const pgvectorDSN = "postgresql://RivaldiMurpia@localhost:5432/dowmindrag"
 
 // skipIfNoPostgres skips the test if PostgreSQL is not available.
 func skipIfNoPostgres(t *testing.T) {
@@ -262,7 +262,7 @@ func TestPGVectorStringID(t *testing.T) {
 	defer cleanupTestTable(t, projectID)
 
 	// Use string IDs like the indexer generates
-	stringID := "enowx-rag/pkg/rag/pgvector.go#chunk0"
+	stringID := "dow-mind/pkg/rag/pgvector.go#chunk0"
 	docs := []Document{
 		{ID: stringID, Content: "hello world from string id test", Meta: map[string]string{"source_file": "pgvector.go"}},
 	}
@@ -347,7 +347,7 @@ WHERE table_name = 'project_memory_test' AND column_name = 'id'
 // Ensure the test binary doesn't fail if env vars are missing.
 func init() {
 	// Set a dummy Voyage API key for any tests that create Voyage clients
-	if os.Getenv("RAG_VOYAGE_API_KEY") == "" {
-		os.Setenv("RAG_VOYAGE_API_KEY", "dummy")
+	if os.Getenv("DOWMIND_VOYAGE_API_KEY") == "" {
+		os.Setenv("DOWMIND_VOYAGE_API_KEY", "dummy")
 	}
 }

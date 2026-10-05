@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/enowdev/enowx-rag/pkg/config"
+	"github.com/RivaldiMurpia/dow-mind/pkg/config"
 )
 
-// mcpServerEntry builds the command + env for the enowx-rag MCP server from the
+// mcpServerEntry builds the command + env for the dow-mind MCP server from the
 // currently saved config. The command is this binary's own path so the client
 // launches the exact server the user configured.
 // mcpServerEntry builds the MCP config entry. When remoteURL is non-empty it
@@ -30,44 +30,44 @@ func mcpServerEntry(remoteURL, token string) (mcpEntry, error) {
 	}
 
 	env := map[string]string{
-		"RAG_VECTOR_STORE": cfg.VectorStore,
-		"RAG_EMBEDDER":     cfg.Embedder,
+		"DOWMIND_VECTOR_STORE": cfg.VectorStore,
+		"DOWMIND_EMBEDDER":     cfg.Embedder,
 	}
 	switch cfg.VectorStore {
 	case "qdrant":
-		env["RAG_QDRANT_URL"] = cfg.QdrantURL
+		env["DOWMIND_QDRANT_URL"] = cfg.QdrantURL
 		if cfg.QdrantAPIKey != "" {
-			env["RAG_QDRANT_API_KEY"] = cfg.QdrantAPIKey
+			env["DOWMIND_QDRANT_API_KEY"] = cfg.QdrantAPIKey
 		}
 	case "chroma":
-		env["RAG_CHROMA_URL"] = cfg.ChromaURL
+		env["DOWMIND_CHROMA_URL"] = cfg.ChromaURL
 	case "pgvector":
 		if cfg.PGVectorDSN != "" {
-			env["RAG_PGVECTOR_DSN"] = cfg.PGVectorDSN
+			env["DOWMIND_PGVECTOR_DSN"] = cfg.PGVectorDSN
 		}
 	}
 	switch cfg.Embedder {
 	case "voyage":
 		if cfg.Voyage.APIKey != "" {
-			env["RAG_VOYAGE_API_KEY"] = cfg.Voyage.APIKey
+			env["DOWMIND_VOYAGE_API_KEY"] = cfg.Voyage.APIKey
 		}
 		if cfg.Voyage.Model != "" {
-			env["RAG_VOYAGE_MODEL"] = cfg.Voyage.Model
+			env["DOWMIND_VOYAGE_MODEL"] = cfg.Voyage.Model
 		}
 	case "tei":
-		env["RAG_TEI_URL"] = cfg.TEIURL
+		env["DOWMIND_TEI_URL"] = cfg.TEIURL
 	case "openai":
 		if cfg.OpenAI.APIKey != "" {
-			env["RAG_OPENAI_API_KEY"] = cfg.OpenAI.APIKey
+			env["DOWMIND_OPENAI_API_KEY"] = cfg.OpenAI.APIKey
 		}
 		if cfg.OpenAI.Model != "" {
-			env["RAG_OPENAI_MODEL"] = cfg.OpenAI.Model
+			env["DOWMIND_OPENAI_MODEL"] = cfg.OpenAI.Model
 		}
 		if cfg.OpenAI.BaseURL != "" {
-			env["RAG_OPENAI_BASE_URL"] = cfg.OpenAI.BaseURL
+			env["DOWMIND_OPENAI_BASE_URL"] = cfg.OpenAI.BaseURL
 		}
 		if cfg.OpenAI.Dim > 0 {
-			env["RAG_OPENAI_DIM"] = fmt.Sprintf("%d", cfg.OpenAI.Dim)
+			env["DOWMIND_OPENAI_DIM"] = fmt.Sprintf("%d", cfg.OpenAI.Dim)
 		}
 	}
 
@@ -75,7 +75,7 @@ func mcpServerEntry(remoteURL, token string) (mcpEntry, error) {
 }
 
 // SetupInstallMCP handles POST /api/setup/install-mcp.
-// It writes (merging, with a .bak backup) the enowx-rag MCP server into the
+// It writes (merging, with a .bak backup) the dow-mind MCP server into the
 // selected client's config file. Body: {client_id, scope, project_dir?}.
 func (h *Handlers) SetupInstallMCP(w http.ResponseWriter, r *http.Request) {
 	var req struct {
@@ -189,14 +189,14 @@ func (h *Handlers) SetupSkillGuide(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"note":        "Skills are supported by some clients only (e.g. Claude Code, Factory). Install manually into your client's skills directory.",
-		"source_file": "skill/enowx-rag.md (in the enowx-rag repo)",
+		"source_file": "skill/dow-mind.md (in the dow-mind repo)",
 		"targets": []target{
-			{Client: "Claude Code", Dir: "~/.claude/skills/enowx-rag/"},
-			{Client: "Factory", Dir: "~/.factory/skills/enowx-rag/"},
+			{Client: "Claude Code", Dir: "~/.claude/skills/dow-mind/"},
+			{Client: "Factory", Dir: "~/.factory/skills/dow-mind/"},
 		},
 		"commands": []string{
-			"mkdir -p ~/.claude/skills/enowx-rag",
-			"cp /path/to/enowx-rag/skill/enowx-rag.md ~/.claude/skills/enowx-rag/skill.md",
+			"mkdir -p ~/.claude/skills/dow-mind",
+			"cp /path/to/dow-mind/skill/dow-mind.md ~/.claude/skills/dow-mind/skill.md",
 		},
 	})
 }

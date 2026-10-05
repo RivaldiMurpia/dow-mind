@@ -1,6 +1,6 @@
 // Package config handles reading, writing, and resolving RAG configuration
 // from three sources with a strict priority: environment variables > config
-// file (~/.enowx-rag/config.yaml) > built-in defaults.
+// file (~/.dow-mind/config.yaml) > built-in defaults.
 //
 // The config file uses YAML and is written with chmod 0600 because it may
 // contain API keys.
@@ -47,14 +47,14 @@ type Config struct {
 	TEIURL        string       `yaml:"tei_url"`
 	RerankerModel string       `yaml:"reranker_model"`
 	// AdminToken, when set, gates /api and /mcp with a bearer token. The env var
-	// RAG_ADMIN_TOKEN takes precedence over this file value (see EffectiveAdminToken).
+	// DOWMIND_ADMIN_TOKEN takes precedence over this file value (see EffectiveAdminToken).
 	AdminToken string `yaml:"admin_token,omitempty"`
 }
 
-// EffectiveAdminToken returns the admin token in effect: the RAG_ADMIN_TOKEN env
+// EffectiveAdminToken returns the admin token in effect: the DOWMIND_ADMIN_TOKEN env
 // var if set, otherwise the value saved in the config file. Empty means no auth.
 func EffectiveAdminToken() string {
-	if v := os.Getenv("RAG_ADMIN_TOKEN"); v != "" {
+	if v := os.Getenv("DOWMIND_ADMIN_TOKEN"); v != "" {
 		return v
 	}
 	cfg, err := Load()
@@ -81,24 +81,24 @@ func Default() *Config {
 	}
 }
 
-// Path returns the absolute path to the config file: ~/.enowx-rag/config.yaml.
+// Path returns the absolute path to the config file: ~/.dow-mind/config.yaml.
 func Path() string {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		// Fall back to a relative path; this should not happen in practice.
-		return filepath.Join(".enowx-rag", "config.yaml")
+		return filepath.Join(".dow-mind", "config.yaml")
 	}
-	return filepath.Join(home, ".enowx-rag", "config.yaml")
+	return filepath.Join(home, ".dow-mind", "config.yaml")
 }
 
 // MetricsDBPath returns the absolute path to the durable metrics database:
-// ~/.enowx-rag/metrics.db.
+// ~/.dow-mind/metrics.db.
 func MetricsDBPath() string {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return filepath.Join(".enowx-rag", "metrics.db")
+		return filepath.Join(".dow-mind", "metrics.db")
 	}
-	return filepath.Join(home, ".enowx-rag", "metrics.db")
+	return filepath.Join(home, ".dow-mind", "metrics.db")
 }
 
 // Load reads the config file from Path() and returns a populated *Config.
@@ -174,51 +174,51 @@ func Resolve() (*Config, error) {
 // environment variables when those variables are set and non-empty.
 // Environment variables always take precedence over file/default values.
 func applyEnvOverrides(cfg *Config) {
-	if v := os.Getenv("RAG_VECTOR_STORE"); v != "" {
+	if v := os.Getenv("DOWMIND_VECTOR_STORE"); v != "" {
 		cfg.VectorStore = v
 	}
-	if v := os.Getenv("RAG_EMBEDDER"); v != "" {
+	if v := os.Getenv("DOWMIND_EMBEDDER"); v != "" {
 		cfg.Embedder = v
 	}
-	if v := os.Getenv("RAG_QDRANT_URL"); v != "" {
+	if v := os.Getenv("DOWMIND_QDRANT_URL"); v != "" {
 		cfg.QdrantURL = v
 	}
-	if v := os.Getenv("RAG_QDRANT_API_KEY"); v != "" {
+	if v := os.Getenv("DOWMIND_QDRANT_API_KEY"); v != "" {
 		cfg.QdrantAPIKey = v
 	}
-	if v := os.Getenv("RAG_CHROMA_URL"); v != "" {
+	if v := os.Getenv("DOWMIND_CHROMA_URL"); v != "" {
 		cfg.ChromaURL = v
 	}
-	if v := os.Getenv("RAG_PGVECTOR_DSN"); v != "" {
+	if v := os.Getenv("DOWMIND_PGVECTOR_DSN"); v != "" {
 		cfg.PGVectorDSN = v
 	}
-	if v := os.Getenv("RAG_TEI_URL"); v != "" {
+	if v := os.Getenv("DOWMIND_TEI_URL"); v != "" {
 		cfg.TEIURL = v
 	}
-	if v := os.Getenv("RAG_VOYAGE_API_KEY"); v != "" {
+	if v := os.Getenv("DOWMIND_VOYAGE_API_KEY"); v != "" {
 		cfg.Voyage.APIKey = v
 	}
-	if v := os.Getenv("RAG_VOYAGE_MODEL"); v != "" {
+	if v := os.Getenv("DOWMIND_VOYAGE_MODEL"); v != "" {
 		cfg.Voyage.Model = v
 	}
-	if v := os.Getenv("RAG_OPENAI_API_KEY"); v != "" {
+	if v := os.Getenv("DOWMIND_OPENAI_API_KEY"); v != "" {
 		cfg.OpenAI.APIKey = v
 	}
-	if v := os.Getenv("RAG_OPENAI_MODEL"); v != "" {
+	if v := os.Getenv("DOWMIND_OPENAI_MODEL"); v != "" {
 		cfg.OpenAI.Model = v
 	}
-	if v := os.Getenv("RAG_OPENAI_BASE_URL"); v != "" {
+	if v := os.Getenv("DOWMIND_OPENAI_BASE_URL"); v != "" {
 		cfg.OpenAI.BaseURL = v
 	}
-	if v := os.Getenv("RAG_OPENAI_DIM"); v != "" {
+	if v := os.Getenv("DOWMIND_OPENAI_DIM"); v != "" {
 		if d, err := strconv.Atoi(v); err == nil && d > 0 {
 			cfg.OpenAI.Dim = d
 		}
 	}
-	if v := os.Getenv("RAG_RERANKER_MODEL"); v != "" {
+	if v := os.Getenv("DOWMIND_RERANKER_MODEL"); v != "" {
 		cfg.RerankerModel = v
 	}
-	if v := os.Getenv("RAG_VECTOR_DIM"); v != "" {
+	if v := os.Getenv("DOWMIND_VECTOR_DIM"); v != "" {
 		if d, err := strconv.Atoi(v); err == nil && d > 0 {
 			cfg.Voyage.Dim = d
 		}

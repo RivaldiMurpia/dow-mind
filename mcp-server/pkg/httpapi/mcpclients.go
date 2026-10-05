@@ -12,7 +12,7 @@ import (
 )
 
 // mcpServerName is the server key/name used across all client configs.
-const mcpServerName = "enowx-rag"
+const mcpServerName = "dow-mind"
 
 // mcpFormat is the on-disk config format of a client.
 type mcpFormat string
@@ -67,7 +67,7 @@ func expandHome(p string) string {
 	return p
 }
 
-// isInstalled reports whether the enowx-rag server is already present in this
+// isInstalled reports whether the dow-mind server is already present in this
 // client's global config. It reads the config file and checks for the server
 // name — a robust cross-format signal since the name is unique and appears as a
 // key (JSON/TOML/context_servers) or a name field (YAML list). Returns false if
@@ -95,7 +95,7 @@ func (c mcpClient) resolvePath(scope, projectDir string) (string, error) {
 	return expandHome(c.GlobalPath), nil
 }
 
-// mcpEntry describes the enowx-rag server for a client config. In local mode it
+// mcpEntry describes the dow-mind server for a client config. In local mode it
 // carries Command + Env (stdio); in remote mode it carries RemoteURL (+ optional
 // Token) so the client connects to a daemon over HTTP.
 type mcpEntry struct {
@@ -207,7 +207,7 @@ func yamlListSnippet(entry mcpEntry) string {
 
 // --- Install (merge-not-replace, with backup) ---
 
-// install writes the enowx-rag server into the client's config at path,
+// install writes the dow-mind server into the client's config at path,
 // merging into any existing content and backing up the original to path.bak.
 // Returns whether a backup was created.
 func (c mcpClient) install(path string, entry mcpEntry) (backedUp bool, err error) {
@@ -302,8 +302,8 @@ func mergeYAMLList(existing []byte, entry mcpEntry) ([]byte, error) {
 	return yaml.Marshal(root)
 }
 
-// mergeTOML merges the enowx-rag server section into an existing TOML file.
-// It preserves all lines except the previous [mcp_servers.enowx-rag*] sections,
+// mergeTOML merges the dow-mind server section into an existing TOML file.
+// It preserves all lines except the previous [mcp_servers.dow-mind*] sections,
 // which are replaced. This avoids a TOML parser dependency; the format we write
 // is fixed and simple.
 func mergeTOML(existing []byte, entry mcpEntry) ([]byte, error) {
@@ -312,7 +312,7 @@ func mergeTOML(existing []byte, entry mcpEntry) ([]byte, error) {
 		return []byte(section), nil
 	}
 
-	// Strip any existing enowx-rag sections (header + body until next section).
+	// Strip any existing dow-mind sections (header + body until next section).
 	lines := strings.Split(string(existing), "\n")
 	var kept []string
 	skipping := false

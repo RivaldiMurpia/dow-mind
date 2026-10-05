@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/enowdev/enowx-rag/pkg/config"
+	"github.com/RivaldiMurpia/dow-mind/pkg/config"
 )
 
 // maskSecret returns a masked view of a secret: first 4 + last 3 chars, middle
@@ -136,6 +136,6 @@ func (h *Handlers) SetupGenToken(w http.ResponseWriter, r *http.Request) {
 		"token":            token,
 		"saved":            true,
 		"env_override":     envOverride,
-		"note":             "Copy this now — it is stored in config.yaml (0600). If RAG_ADMIN_TOKEN is set in the environment, that value takes precedence at runtime.",
+		"note":             "Copy this now — it is stored in config.yaml (0600). If DOWMIND_ADMIN_TOKEN is set in the environment, that value takes precedence at runtime.",
 	})
 }

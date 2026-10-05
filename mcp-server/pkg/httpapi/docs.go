@@ -81,7 +81,7 @@ func (h *Handlers) SetupDocs(w http.ResponseWriter, r *http.Request) {
 // --- Section bodies ---
 
 func docOverview(base, _ string) string {
-	return `# enowx-rag
+	return `# dow-mind
 
 Per-project RAG (retrieval-augmented generation) memory for AI coding agents.
 Each project gets its own vector collection, so an agent can index context about
@@ -95,7 +95,7 @@ a codebase and retrieve it quickly and in isolation.
 
 ## Two run modes (one binary)
 
-- **MCP stdio** (default): the agent talks to enowx-rag over the Model Context
+- **MCP stdio** (default): the agent talks to dow-mind over the Model Context
   Protocol. This is what you configure in Claude Code, Cursor, etc.
 - **HTTP + dashboard** (` + "`--serve`" + `): a REST API, an SSE event stream, and an
   embedded web dashboard (Overview, Playground, Chunks, Migration, Docs, Setup).
@@ -120,10 +120,10 @@ func docQuickstart(base, exe string) string {
 Set a vector store + embedder. The fastest path is Qdrant + Voyage AI (free
 tier). Either use the **Setup** wizard in the dashboard, or set env vars:
 
-    RAG_VECTOR_STORE=qdrant
-    RAG_QDRANT_URL=http://localhost:6333
-    RAG_EMBEDDER=voyage
-    RAG_VOYAGE_API_KEY=pa-...
+    DOWMIND_VECTOR_STORE=qdrant
+    DOWMIND_QDRANT_URL=http://localhost:6333
+    DOWMIND_EMBEDDER=voyage
+    DOWMIND_VOYAGE_API_KEY=pa-...
 
 ## 2. Run
 
@@ -139,53 +139,53 @@ client (Claude Code, Cursor, …), or let an agent do it — see *Agent setup*.
 
 ## 4. Index a project
 
-From your agent call the ` + "`rag_index_project`" + ` MCP tool with the project
+From your agent call the ` + "`mind_index_project`" + ` MCP tool with the project
 directory, or from the API:
 
     POST %s/api/projects/<PROJECT_ID>/reindex   { "directory": "/abs/path" }
 
 ## 5. Retrieve
 
-Ask your agent to use ` + "`rag_retrieve_context`" + `, or try the **Playground** in
+Ask your agent to use ` + "`mind_retrieve_context`" + `, or try the **Playground** in
 the dashboard.`, exe, base)
 }
 
 func docMCPTools(_, _ string) string {
 	return "# MCP tools\n\n" +
-		"enowx-rag exposes these MCP tools (over stdio or remote HTTP). Project IDs isolate " +
+		"dow-mind exposes these MCP tools (over stdio or remote HTTP). Project IDs isolate " +
 		"collections.\n\n" +
 		"## Write / index\n" +
-		"## `rag_create_project`\nCreate a project collection. Input: `project_id`.\n\n" +
-		"## `rag_index`\nIndex documents you pass directly. Input: `project_id`, `documents` " +
+		"## `mind_create_project`\nCreate a project collection. Input: `project_id`.\n\n" +
+		"## `mind_index`\nIndex documents you pass directly. Input: `project_id`, `documents` " +
 		"(each `{id?, content, meta?}`). Use for saving facts/decisions.\n\n" +
-		"## `rag_index_project`\nScan a directory and index all code/text files (insertions, edits, " +
+		"## `mind_index_project`\nScan a directory and index all code/text files (insertions, edits, " +
 		"deletions handled incrementally; skips node_modules/.git/vendor/dist/build). " +
 		"Input: `project_id`, `directory`. Run this whenever the codebase changes.\n\n" +
 		"## Read / search\n" +
-		"## `rag_semantic_search`\nSearch a project. Input: `project_id`, `query`, `limit`, and " +
+		"## `mind_semantic_search`\nSearch a project. Input: `project_id`, `query`, `limit`, and " +
 		"optionally `recall`, `hybrid`, `rerank`, `compress` (hybrid/rerank default on). Returns " +
 		"chunks with scores.\n\n" +
-		"## `rag_retrieve_context`\nLike search but returns a compact concatenated context string " +
-		"plus the chunks — convenient for feeding an LLM. Same options as `rag_semantic_search`.\n\n" +
+		"## `mind_retrieve_context`\nLike search but returns a compact concatenated context string " +
+		"plus the chunks — convenient for feeding an LLM. Same options as `mind_semantic_search`.\n\n" +
 		"## Inspect / manage\n" +
-		"## `rag_list_projects`\nList all projects with chunk counts. Discover available memory " +
+		"## `mind_list_projects`\nList all projects with chunk counts. Discover available memory " +
 		"before searching. No input.\n\n" +
-		"## `rag_project_exists`\nCheck whether a project has indexed memory. Input: `project_id`.\n\n" +
-		"## `rag_list_points`\nList chunks in a project (id, source file, preview), optionally " +
+		"## `mind_project_exists`\nCheck whether a project has indexed memory. Input: `project_id`.\n\n" +
+		"## `mind_list_points`\nList chunks in a project (id, source file, preview), optionally " +
 		"filtered by `source_file`. Input: `project_id`, `source_file?`.\n\n" +
-		"## `rag_delete_points`\nDelete specific chunks by ID (remove stale entries without a full " +
+		"## `mind_delete_points`\nDelete specific chunks by ID (remove stale entries without a full " +
 		"re-index). Input: `project_id`, `point_ids`.\n\n" +
-		"## `rag_delete_project`\nDelete a project collection and all its data. Input: `project_id`.\n\n" +
-		"## `rag_stats`\nAggregate stats: projects, total chunks, embed model, latency, tokens. No input.\n\n" +
-		"**Typical loop:** `rag_list_projects` to see what exists → `rag_retrieve_context` before " +
-		"coding → do the work → `rag_index` new facts → `rag_index_project` to sync file changes."
+		"## `mind_delete_project`\nDelete a project collection and all its data. Input: `project_id`.\n\n" +
+		"## `mind_stats`\nAggregate stats: projects, total chunks, embed model, latency, tokens. No input.\n\n" +
+		"**Typical loop:** `mind_list_projects` to see what exists → `mind_retrieve_context` before " +
+		"coding → do the work → `mind_index` new facts → `mind_index_project` to sync file changes."
 }
 
 func docAPIReference(base, _ string) string {
 	return fmt.Sprintf(`# API reference
 
 All endpoints are under %s/api. Endpoints that write files or config are
-restricted to localhost or a valid `+"`RAG_ADMIN_TOKEN`"+` bearer token.
+restricted to localhost or a valid `+"`DOWMIND_ADMIN_TOKEN`"+` bearer token.
 
 ## Projects & search
 - `+"`GET /api/projects`"+` — list projects with chunk counts
@@ -203,14 +203,14 @@ restricted to localhost or a valid `+"`RAG_ADMIN_TOKEN`"+` bearer token.
 
 ## Setup & install
 - `+"`POST /api/setup/test`"+` — test vector store + embedder connectivity
-- `+"`POST /api/setup/apply`"+` — save config to ~/.enowx-rag/config.yaml
+- `+"`POST /api/setup/apply`"+` — save config to ~/.dow-mind/config.yaml
 - `+"`GET /api/setup/status`"+` — is config present
 - `+"`GET /api/setup/clients`"+` — supported MCP clients
 - `+"`POST /api/setup/install-mcp`"+` — write the server into a client's config (merge + backup)
 - `+"`GET /api/setup/mcp-snippet?client_id=`"+` — manual config snippet
 - `+"`GET /api/setup/skill-guide`"+` — skill install instructions
 - `+"`GET /api/setup/probe?client=&dir=`"+` — what's already installed (for idempotent setup)
-- `+"`POST /api/setup/write-agents-md`"+` — merge the enowx-rag block into AGENTS.md
+- `+"`POST /api/setup/write-agents-md`"+` — merge the dow-mind block into AGENTS.md
 - `+"`GET /api/setup/config`"+` — current config, secrets masked
 - `+"`GET /api/setup/config/reveal`"+` — full secrets (localhost or admin token)
 - `+"`POST /api/setup/config`"+` — update keys/settings
@@ -226,25 +226,25 @@ restricted to localhost or a valid `+"`RAG_ADMIN_TOKEN`"+` bearer token.
 
 func docEmbedders(_, _ string) string {
 	return "# Embedders\n\n" +
-		"Set with `RAG_EMBEDDER`. The embedding model and dimension must stay consistent " +
+		"Set with `DOWMIND_EMBEDDER`. The embedding model and dimension must stay consistent " +
 		"within a collection — changing them requires re-indexing or a *Migration*.\n\n" +
-		"## Voyage AI (`voyage`)\nHosted, high quality, free tier. `RAG_VOYAGE_API_KEY`, " +
-		"`RAG_VOYAGE_MODEL` (default `voyage-4`). Also powers reranking (`RAG_RERANKER_MODEL`).\n\n" +
+		"## Voyage AI (`voyage`)\nHosted, high quality, free tier. `DOWMIND_VOYAGE_API_KEY`, " +
+		"`DOWMIND_VOYAGE_MODEL` (default `voyage-4`). Also powers reranking (`DOWMIND_RERANKER_MODEL`).\n\n" +
 		"## OpenAI-compatible (`openai`)\nAny `/v1/embeddings` API — OpenAI, Together, Jina, " +
-		"Mistral, a local Ollama, LiteLLM, etc. Set `RAG_OPENAI_BASE_URL`, `RAG_OPENAI_MODEL`, " +
-		"`RAG_OPENAI_API_KEY` (empty for local), `RAG_OPENAI_DIM` (0 = auto-detect).\n\n" +
+		"Mistral, a local Ollama, LiteLLM, etc. Set `DOWMIND_OPENAI_BASE_URL`, `DOWMIND_OPENAI_MODEL`, " +
+		"`DOWMIND_OPENAI_API_KEY` (empty for local), `DOWMIND_OPENAI_DIM` (0 = auto-detect).\n\n" +
 		"## TEI (`tei`)\nSelf-hosted Text Embeddings Inference. Serve **any** local model " +
-		"(BGE, GTE, E5, nomic-embed, …) and point `RAG_TEI_URL` at it. TEI is a server, not a " +
+		"(BGE, GTE, E5, nomic-embed, …) and point `DOWMIND_TEI_URL` at it. TEI is a server, not a " +
 		"single model."
 }
 
 func docVectorStores(_, _ string) string {
 	return "# Vector stores\n\n" +
-		"Set with `RAG_VECTOR_STORE`. One project = one collection.\n\n" +
+		"Set with `DOWMIND_VECTOR_STORE`. One project = one collection.\n\n" +
 		"## Qdrant (`qdrant`)\nSupported. Per-collection dimension (flexible for migration). " +
-		"`RAG_QDRANT_URL`, optional `RAG_QDRANT_API_KEY` (cloud).\n\n" +
+		"`DOWMIND_QDRANT_URL`, optional `DOWMIND_QDRANT_API_KEY` (cloud).\n\n" +
 		"## pgvector (`pgvector`)\nSupported; recommended for **hybrid search** and the " +
-		"dense/lexical **retrieval breakdown**. `RAG_PGVECTOR_DSN`. Note: all projects share one " +
+		"dense/lexical **retrieval breakdown**. `DOWMIND_PGVECTOR_DSN`. Note: all projects share one " +
 		"table with a **fixed** vector dimension — changing dimension means migrating to a new " +
 		"table.\n\n" +
 		"## Chroma (`chroma`)\n**Experimental** — targets the legacy `/api/v1` REST API and is " +
@@ -300,51 +300,51 @@ func docMetrics(base, _ string) string {
 		"that don't report, e.g. TEI).\n"+
 		"- **Retrieval breakdown** — dense vs. lexical counts on pgvector hybrid searches.\n"+
 		"- **Backend** and **persistent** flag.\n\n"+
-		"## Persistence\nMetrics are stored in a local SQLite file (`~/.enowx-rag/metrics.db`, "+
+		"## Persistence\nMetrics are stored in a local SQLite file (`~/.dow-mind/metrics.db`, "+
 		"pure-Go, no external service), so they survive restarts on **any** backend. If the file "+
 		"can't be opened, metrics fall back to in-memory (`\"persistent\": false`).", base)
 }
 
 func docRemote(base, _ string) string {
 	return "# Remote / daemon\n\n" +
-		"Run enowx-rag as a **daemon** (e.g. on a VPS) and let agents connect **remotely** over " +
+		"Run dow-mind as a **daemon** (e.g. on a VPS) and let agents connect **remotely** over " +
 		"MCP-over-HTTP — a centralized RAG memory shared across machines/agents.\n\n" +
 		"## Run the daemon\n" +
-		"`enowx-rag --serve` exposes three things on one port:\n" +
+		"`dow-mind --serve` exposes three things on one port:\n" +
 		"- `/api/*` — REST API\n" +
 		"- `/mcp` — MCP server over HTTP (Streamable HTTP transport, stateless)\n" +
 		"- `/` — the web dashboard\n\n" +
 		"## Secure it (required when public)\n" +
-		"Set `RAG_ADMIN_TOKEN` to a strong secret. It gates **both** `/api/*` and `/mcp` with " +
+		"Set `DOWMIND_ADMIN_TOKEN` to a strong secret. It gates **both** `/api/*` and `/mcp` with " +
 		"`Authorization: Bearer <token>`. When unset, there is **no auth** — only safe for a trusted " +
 		"local network. Terminate TLS with a reverse proxy (Caddy/nginx) in front.\n\n" +
-		"    RAG_ADMIN_TOKEN=$(openssl rand -hex 32) enowx-rag --serve --addr :7777\n\n" +
+		"    DOWMIND_ADMIN_TOKEN=$(openssl rand -hex 32) dow-mind --serve --addr :7777\n\n" +
 		"## Connect an agent (MCP remote)\n" +
 		"Point your MCP client at the daemon URL with the bearer header:\n\n" +
-		"    {\n      \"mcpServers\": {\n        \"enowx-rag\": {\n          \"url\": \"https://rag.example.com/mcp\",\n" +
-		"          \"headers\": { \"Authorization\": \"Bearer <RAG_ADMIN_TOKEN>\" }\n        }\n      }\n    }\n\n" +
+		"    {\n      \"mcpServers\": {\n        \"dow-mind\": {\n          \"url\": \"https://rag.example.com/mcp\",\n" +
+		"          \"headers\": { \"Authorization\": \"Bearer <DOWMIND_ADMIN_TOKEN>\" }\n        }\n      }\n    }\n\n" +
 		"All six MCP tools (see *MCP tools*) work identically to the local stdio mode.\n\n" +
 		"## Local vs. remote\n" +
-		"- **Local**: run `enowx-rag` with no flags — stdio, spawned by the client. No daemon needed.\n" +
-		"- **Remote**: run `enowx-rag --serve` on a host; clients connect to `/mcp` by URL.\n\n" +
+		"- **Local**: run `dow-mind` with no flags — stdio, spawned by the client. No daemon needed.\n" +
+		"- **Remote**: run `dow-mind --serve` on a host; clients connect to `/mcp` by URL.\n\n" +
 		"The vector store (Qdrant/pgvector) can be local to the daemon or a managed cloud instance."
 }
 
 func docAgentSetup(base, exe string) string {
 	return fmt.Sprintf(`# Agent setup
 
-Set up enowx-rag (per-project RAG memory) for the current project. Do the steps
+Set up dow-mind (per-project RAG memory) for the current project. Do the steps
 below in order. Skip any step that the probe reports as already done. All calls
-go to the enowx-rag server at %s.
+go to the dow-mind server at %s.
 
 ## 1. Probe what already exists
 
 GET %s/api/setup/probe?client=<CLIENT_ID>&dir=<ABS_PROJECT_DIR>
 
 Response:
-- mcp: { "<client>": true|false }  — is the enowx-rag MCP server in that client's config
+- mcp: { "<client>": true|false }  — is the dow-mind MCP server in that client's config
 - skill: { installed: bool, dir }  — is the skill installed
-- agents_md: { exists, has_block } — does the project's AGENTS.md have the enowx-rag block
+- agents_md: { exists, has_block } — does the project's AGENTS.md have the dow-mind block
 
 Pick CLIENT_ID from: claude-code, claude-desktop, cursor, cline, windsurf, codex, zed, continue.
 
@@ -352,16 +352,16 @@ Pick CLIENT_ID from: claude-code, claude-desktop, cursor, cline, windsurf, codex
 
 POST %s/api/setup/install-mcp  { "client_id": "<CLIENT_ID>", "scope": "global" }
 
-This merges the enowx-rag server into the client's config (backing up the
+This merges the dow-mind server into the client's config (backing up the
 original). For a manual snippet instead: GET %s/api/setup/mcp-snippet?client_id=<CLIENT_ID>.
 
 The MCP server binary is: %s
 
 ### Local vs. remote
 - **Local (default)**: the client spawns the binary above over stdio.
-- **Remote daemon**: to connect to an enowx-rag daemon (running elsewhere with
-  ` + "`enowx-rag --serve`" + `), add ` + "`mode: \"remote\"`" + `, ` + "`remote_url`" + ` (e.g.
-  https://rag.example.com/mcp), and ` + "`token`" + ` (its RAG_ADMIN_TOKEN) to the
+- **Remote daemon**: to connect to an dow-mind daemon (running elsewhere with
+  ` + "`dow-mind --serve`" + `), add ` + "`mode: \"remote\"`" + `, ` + "`remote_url`" + ` (e.g.
+  https://rag.example.com/mcp), and ` + "`token`" + ` (its DOWMIND_ADMIN_TOKEN) to the
   install-mcp body — or ` + "`?mode=remote&remote_url=...&token=...`" + ` on the snippet.
   This writes a ` + "`{url, headers: {Authorization}}`" + ` entry instead of a local command.
   See the *Remote / daemon* section.
@@ -375,8 +375,8 @@ exact commands: GET %s/api/setup/skill-guide — then run them.
 
 POST %s/api/setup/write-agents-md  { "dir": "<ABS_PROJECT_DIR>", "project_id": "<PROJECT_ID>" }
 
-This merges an enowx-rag section into AGENTS.md idempotently (markers
-<!-- enowx-rag:start --> ... <!-- enowx-rag:end -->), preserving existing content.
+This merges an dow-mind section into AGENTS.md idempotently (markers
+<!-- dow-mind:start --> ... <!-- dow-mind:end -->), preserving existing content.
 
 ## 5. Index the project (optional but recommended)
 
@@ -385,6 +385,6 @@ POST %s/api/projects/<PROJECT_ID>/reindex  { "directory": "<ABS_PROJECT_DIR>" }
 ## Notes
 - Use an absolute project directory for dir.
 - PROJECT_ID is a short slug for this project (e.g. the repo name).
-- Endpoints that write files require the request to originate from localhost (or a valid RAG_ADMIN_TOKEN).
+- Endpoints that write files require the request to originate from localhost (or a valid DOWMIND_ADMIN_TOKEN).
 `, base, base, base, base, exe, base, base, base)
 }

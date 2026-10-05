@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a problem with enowx-rag
+description: Report a problem with dow-mind
 labels: ["bug"]
 body:
   - type: markdown
@@ -19,7 +19,7 @@ body:
       label: Steps to reproduce
       placeholder: |
         1. Configure with ...
-        2. Run `rag_index` / `--serve` ...
+        2. Run `mind_index` / `--serve` ...
         3. See error ...
     validations:
       required: true

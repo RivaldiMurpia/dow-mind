@@ -12,11 +12,11 @@ import (
 
 func testEntry() mcpEntry {
 	return mcpEntry{
-		Command: "/usr/local/bin/enowx-rag",
+		Command: "/usr/local/bin/dow-mind",
 		Env: map[string]string{
-			"RAG_VECTOR_STORE":   "qdrant",
-			"RAG_QDRANT_URL":     "http://localhost:6333",
-			"RAG_VOYAGE_API_KEY": "secret",
+			"DOWMIND_VECTOR_STORE":   "qdrant",
+			"DOWMIND_QDRANT_URL":     "http://localhost:6333",
+			"DOWMIND_VOYAGE_API_KEY": "secret",
 		},
 	}
 }
@@ -37,8 +37,8 @@ func TestMergeJSONPreservesOtherServers(t *testing.T) {
 	if _, ok := servers["other"]; !ok {
 		t.Error("existing 'other' server was dropped")
 	}
-	if _, ok := servers["enowx-rag"]; !ok {
-		t.Error("enowx-rag server was not added")
+	if _, ok := servers["dow-mind"]; !ok {
+		t.Error("dow-mind server was not added")
 	}
 	if root["someTopLevel"] != true {
 		t.Error("top-level key was dropped")
@@ -66,7 +66,7 @@ func TestZedContextServers(t *testing.T) {
 	if !ok {
 		t.Fatal("expected context_servers key")
 	}
-	entry := cs["enowx-rag"].(map[string]any)
+	entry := cs["dow-mind"].(map[string]any)
 	if _, ok := entry["args"]; !ok {
 		t.Error("Zed entry must include args")
 	}
@@ -80,12 +80,12 @@ func TestTOMLMerge(t *testing.T) {
 		t.Fatalf("mergeTOML fresh: %v", err)
 	}
 	s := string(out)
-	if !strings.Contains(s, "[mcp_servers.enowx-rag]") || !strings.Contains(s, "[mcp_servers.enowx-rag.env]") {
+	if !strings.Contains(s, "[mcp_servers.dow-mind]") || !strings.Contains(s, "[mcp_servers.dow-mind.env]") {
 		t.Errorf("TOML missing expected sections:\n%s", s)
 	}
 
 	// Existing file with another server + our old section.
-	existing := []byte("[mcp_servers.other]\ncommand = \"/bin/other\"\n\n[mcp_servers.enowx-rag]\ncommand = \"/old\"\n")
+	existing := []byte("[mcp_servers.other]\ncommand = \"/bin/other\"\n\n[mcp_servers.dow-mind]\ncommand = \"/old\"\n")
 	out2, err := mergeTOML(existing, testEntry())
 	if err != nil {
 		t.Fatalf("mergeTOML existing: %v", err)
@@ -94,8 +94,8 @@ func TestTOMLMerge(t *testing.T) {
 	if !strings.Contains(s2, "[mcp_servers.other]") {
 		t.Error("other TOML server was dropped")
 	}
-	if strings.Count(s2, "[mcp_servers.enowx-rag]") != 1 {
-		t.Errorf("enowx-rag section should appear exactly once:\n%s", s2)
+	if strings.Count(s2, "[mcp_servers.dow-mind]") != 1 {
+		t.Errorf("dow-mind section should appear exactly once:\n%s", s2)
 	}
 	if strings.Contains(s2, "/old") {
 		t.Error("old command should have been replaced")
@@ -115,13 +115,13 @@ func TestYAMLListMerge(t *testing.T) {
 	}
 	list := root["mcpServers"].([]any)
 	if len(list) != 2 {
-		t.Fatalf("expected 2 items (other + enowx-rag), got %d", len(list))
+		t.Fatalf("expected 2 items (other + dow-mind), got %d", len(list))
 	}
 	names := map[string]bool{}
 	for _, it := range list {
 		names[it.(map[string]any)["name"].(string)] = true
 	}
-	if !names["other"] || !names["enowx-rag"] {
+	if !names["other"] || !names["dow-mind"] {
 		t.Errorf("expected both servers, got %v", names)
 	}
 }
@@ -176,7 +176,7 @@ func TestRemoteEntry_JSON(t *testing.T) {
 	}
 	var root map[string]any
 	json.Unmarshal(out, &root)
-	e := root["mcpServers"].(map[string]any)["enowx-rag"].(map[string]any)
+	e := root["mcpServers"].(map[string]any)["dow-mind"].(map[string]any)
 	if e["url"] != "https://rag.example.com/mcp" {
 		t.Errorf("url missing: %v", e)
 	}

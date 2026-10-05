@@ -402,7 +402,7 @@ func (p *QdrantProvider) CountPoints(ctx context.Context, projectID string) (int
 //
 // Note: collection names are sanitized (see sanitize), which is lossy for
 // project IDs containing characters outside [A-Za-z0-9_-]. For such IDs the
-// returned value is the sanitized form. Common IDs (e.g. "enowx-rag") round-trip
+// returned value is the sanitized form. Common IDs (e.g. "dow-mind") round-trip
 // exactly.
 func (p *QdrantProvider) ListProjectIDs(ctx context.Context) ([]string, error) {
 	var resp struct {

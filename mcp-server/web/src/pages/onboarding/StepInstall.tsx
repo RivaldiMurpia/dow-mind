@@ -56,7 +56,7 @@ export function StepInstall({ onBack, onNext }: StepInstallProps) {
   // only the missing steps. Uses the current origin so it works wherever hosted.
   const docsURL = `${window.location.origin}/api/docs/setup`
   const agentPrompt =
-    `Set up enowx-rag (per-project RAG memory) for this project. ` +
+    `Set up dow-mind (per-project RAG memory) for this project. ` +
     `First read the setup instructions at ${docsURL} and follow them exactly: ` +
     `probe what's already installed, then install only the missing pieces ` +
     `(MCP server for my client, the skill, and the AGENTS.md block). ` +
@@ -91,10 +91,10 @@ export function StepInstall({ onBack, onNext }: StepInstallProps) {
       <div className="card-head">
         <h2>Install MCP Server</h2>
         <span className="step-badge mono">6 / 7</span>
-        <span className="card-hint">Connect enowx-rag to your AI tool</span>
+        <span className="card-hint">Connect dow-mind to your AI tool</span>
       </div>
       <div className="card-body">
-        <p>Pick your MCP client. enowx-rag can write the config for you, or show a snippet to paste manually.</p>
+        <p>Pick your MCP client. dow-mind can write the config for you, or show a snippet to paste manually.</p>
 
         {/* Client picker */}
         <div className="field-label">Client</div>
@@ -132,10 +132,10 @@ export function StepInstall({ onBack, onNext }: StepInstallProps) {
             <div className="field-row">
               <div className="field"><label>Daemon URL</label>
                 <input className="input mono" value={remoteURL} onChange={(e) => setRemoteURL(e.target.value)} placeholder="https://rag.example.com/mcp" /></div>
-              <div className="field"><label>Token (RAG_ADMIN_TOKEN)</label>
+              <div className="field"><label>Token (DOWMIND_ADMIN_TOKEN)</label>
                 <input className="input mono" type="password" value={remoteToken} onChange={(e) => setRemoteToken(e.target.value)} placeholder="Bearer token, if set" /></div>
             </div>
-            <div className="field-hint">Connect to an enowx-rag daemon (`enowx-rag --serve`) over HTTP instead of spawning a local binary.</div>
+            <div className="field-hint">Connect to an dow-mind daemon (`dow-mind --serve`) over HTTP instead of spawning a local binary.</div>
           </div>
         )}
 
@@ -204,8 +204,8 @@ export function StepInstall({ onBack, onNext }: StepInstallProps) {
         {selected === 'other' && (
           <div style={{ marginTop: 14 }}>
             <p className="welcome-explain">
-              For a client not listed above, add an MCP server named <code className="mono">enowx-rag</code>{' '}
-              that runs the enowx-rag binary. Use one of the snippets from a listed client with a similar
+              For a client not listed above, add an MCP server named <code className="mono">dow-mind</code>{' '}
+              that runs the dow-mind binary. Use one of the snippets from a listed client with a similar
               format as a template, adapting the file path and key for your tool.
             </p>
           </div>

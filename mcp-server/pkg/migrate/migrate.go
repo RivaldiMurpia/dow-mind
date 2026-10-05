@@ -1,6 +1,6 @@
 // Package migrate moves a project's data from a source rag.Provider to a
 // destination provider, re-embedding through the destination's embedder. This
-// is how enowx-rag changes embedding dimension/model or moves between vector
+// is how dow-mind changes embedding dimension/model or moves between vector
 // stores: the source's stored text is exported (never the raw vectors, which
 // are model-specific and non-portable) and re-embedded at the destination.
 package migrate
@@ -9,7 +9,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/enowdev/enowx-rag/pkg/rag"
+	"github.com/RivaldiMurpia/dow-mind/pkg/rag"
 )
 
 // Progress reports migration advancement. Total is the number of documents to
@@ -20,7 +20,7 @@ type Progress struct {
 }
 
 // Migrator re-embeds a project from Src into Dst. Src is any rag.Exporter — an
-// enowx-rag provider OR an external cloud connector (see pkg/migrate/cloud) —
+// dow-mind provider OR an external cloud connector (see pkg/migrate/cloud) —
 // so the same write/re-embed path serves in-store migration and cloud import.
 type Migrator struct {
 	Src rag.Exporter

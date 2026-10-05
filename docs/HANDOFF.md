@@ -1,4 +1,4 @@
-# HANDOFF — enowx-rag
+# HANDOFF — dow-mind
 
 > Untuk agent (Claude Code / Droid / Cursor / dll) yang melanjutkan pekerjaan di project ini.
 > Baca ini **dulu**, lalu [`PLANNING.md`](./PLANNING.md) untuk spesifikasi implementasi.
@@ -8,26 +8,26 @@
 
 ## 1. Apa ini
 
-`enowx-rag` = **per-project RAG memory MCP server** (Go, stdio transport). Tiap project punya collection vektor terisolasi (`project_<PROJECT_ID>`) sehingga LLM bisa meng-index konteks codebase dan meretrieve-nya cepat.
+`dow-mind` = **per-project RAG memory MCP server** (Go, stdio transport). Tiap project punya collection vektor terisolasi (`project_<PROJECT_ID>`) sehingga LLM bisa meng-index konteks codebase dan meretrieve-nya cepat.
 
 **Sedang dikembangkan** menjadi platform RAG dengan UI (dashboard + retrieval playground + onboarding wizard) — lihat `PLANNING.md`. Kode UI/HTTP **belum ada**; yang ada sekarang murni MCP server.
 
-- Repo: https://github.com/enowdev/enowx-rag
-- Lokal: `/Users/enowdev/Project/enowx-rag`
-- Bahasa: Go 1.26 (module `github.com/enowdev/enowx-rag`)
+- Repo: https://github.com/RivaldiMurpia/dow-mind
+- Lokal: `~/Project/dow-mind`
+- Bahasa: Go 1.26 (module `github.com/RivaldiMurpia/dow-mind`)
 - Binary: `mcp-server/mcp-server` (hasil `go build ./cmd/mcp-server`)
 
 ---
 
 ## 2. PENTING — project ID untuk RAG project ini
 
-Saat memakai RAG memory untuk **project enowx-rag sendiri**, gunakan:
+Saat memakai RAG memory untuk **project dow-mind sendiri**, gunakan:
 
 ```
-PROJECT_ID = enowx-rag
+PROJECT_ID = dow-mind
 ```
 
-Collection: `project_enowx-rag`. Sudah ada isinya (17 file, 76 chunk per 2026-07-11).
+Collection: `project_dow-mind`. Sudah ada isinya (17 file, 76 chunk per 2026-07-11).
 
 ---
 
@@ -38,7 +38,7 @@ Project ini memakai MCP server-nya sendiri untuk memori. Alur wajib:
 ### Sebelum coding / menjawab pertanyaan arsitektur
 Panggil MCP tool:
 ```
-rag_retrieve_context(project_id="enowx-rag", query="<pertanyaan/topik user>")
+mind_retrieve_context(project_id="dow-mind", query="<pertanyaan/topik user>")
 ```
 Baca konteks yang kembali. Kalau relevan, pakai untuk membentuk jawaban/rencana. Kalau kosong/tak relevan, lanjut normal.
 
@@ -46,12 +46,12 @@ Baca konteks yang kembali. Kalau relevan, pakai untuk membentuk jawaban/rencana.
 1. Ringkas apa yang diubah.
 2. Sinkronkan file ke RAG:
    ```
-   rag_index_project(project_id="enowx-rag", directory="/Users/enowdev/Project/enowx-rag")
+   mind_index_project(project_id="dow-mind", directory="~/Project/dow-mind")
    ```
    Ini menangani file baru, edit, dan penghapusan otomatis.
 3. Simpan fakta/keputusan penting yang tak terlihat dari kode:
    ```
-   rag_index(project_id="enowx-rag", documents=[{content:"...", meta:{type:"decision"}}])
+   mind_index(project_id="dow-mind", documents=[{content:"...", meta:{type:"decision"}}])
    ```
 
 ### Tag metadata yang dipakai
@@ -63,30 +63,30 @@ Baca konteks yang kembali. Kalau relevan, pakai untuk membentuk jawaban/rencana.
 
 | Tool | Fungsi | Argumen utama |
 |---|---|---|
-| `rag_create_project` | Buat collection project (aman dipanggil ulang) | `project_id` |
-| `rag_delete_project` | Hapus collection + semua memori | `project_id` |
-| `rag_index` | Index dokumen manual (fakta/keputusan) | `project_id`, `documents[]` |
-| `rag_index_project` | Scan direktori & auto-index semua file kode/teks (handle insert + delete) | `project_id`, `directory` |
-| `rag_semantic_search` | Semantic search, kembalikan chunk + skor | `project_id`, `query`, `limit` |
-| `rag_retrieve_context` | String konteks ringkas untuk LLM (gabungan top chunk) | `project_id`, `query`, `limit` |
+| `mind_create_project` | Buat collection project (aman dipanggil ulang) | `project_id` |
+| `mind_delete_project` | Hapus collection + semua memori | `project_id` |
+| `mind_index` | Index dokumen manual (fakta/keputusan) | `project_id`, `documents[]` |
+| `mind_index_project` | Scan direktori & auto-index semua file kode/teks (handle insert + delete) | `project_id`, `directory` |
+| `mind_semantic_search` | Semantic search, kembalikan chunk + skor | `project_id`, `query`, `limit` |
+| `mind_retrieve_context` | String konteks ringkas untuk LLM (gabungan top chunk) | `project_id`, `query`, `limit` |
 
 Catatan implementasi:
-- `rag_index_project` skip `node_modules`, `.git`, `vendor`, `dist`, `build`, dll (lihat `defaultIgnores` di `pkg/indexer/indexer.go`), skip file > 500KB, chunkSize 1500 char.
+- `mind_index_project` skip `node_modules`, `.git`, `vendor`, `dist`, `build`, dll (lihat `defaultIgnores` di `pkg/indexer/indexer.go`), skip file > 500KB, chunkSize 1500 char.
 - Stale reconcile per `source_dir` (base name direktori) — meng-index dua direktori berbeda ke project sama **tidak** saling menghapus.
 
 ---
 
 ## 5. Skill
 
-Skill (`skill/enowx-rag.md`, ~20KB) adalah panduan setup/onboarding yang bisa dipasang ke tool apa pun.
+Skill (`skill/dow-mind.md`, ~20KB) adalah panduan setup/onboarding yang bisa dipasang ke tool apa pun.
 
-- **Terpasang di:** `~/.factory/skills/enowx-rag/skill.md` (Factory Droid global).
+- **Terpasang di:** `~/.factory/skills/dow-mind/skill.md` (Factory Droid global).
 - **Install ulang / ke tool lain:**
   ```bash
-  mkdir -p ~/.factory/skills/enowx-rag
-  cp /Users/enowdev/Project/enowx-rag/skill/enowx-rag.md ~/.factory/skills/enowx-rag/skill.md
+  mkdir -p ~/.factory/skills/dow-mind
+  cp ~/Project/dow-mind/skill/dow-mind.md ~/.factory/skills/dow-mind/skill.md
   ```
-  Untuk tool lain, taruh di direktori skill tool tersebut (mis. `.agents/skills/enowx-rag/skill.md`). Jangan asumsikan `~/.factory` untuk tool non-Droid.
+  Untuk tool lain, taruh di direktori skill tool tersebut (mis. `.agents/skills/dow-mind/skill.md`). Jangan asumsikan `~/.factory` untuk tool non-Droid.
 - Skill berisi dua path: **Option A** (setup penuh dari nol) & **Option B** (onboard project baru saat MCP sudah terpasang). Detail lengkap di `README.md`.
 
 ---
@@ -98,13 +98,13 @@ Claude Code (`~/.claude.json` atau `.mcp.json`):
 ```json
 {
   "mcpServers": {
-    "enowx-rag": {
-      "command": "/Users/enowdev/Project/enowx-rag/mcp-server/mcp-server",
+    "dow-mind": {
+      "command": "~/Project/dow-mind/mcp-server/mcp-server",
       "env": {
-        "RAG_VECTOR_STORE": "qdrant",
-        "RAG_QDRANT_URL": "http://localhost:6333",
-        "RAG_VOYAGE_API_KEY": "your-voyage-api-key",
-        "RAG_VOYAGE_MODEL": "voyage-4"
+        "DOWMIND_VECTOR_STORE": "qdrant",
+        "DOWMIND_QDRANT_URL": "http://localhost:6333",
+        "DOWMIND_VOYAGE_API_KEY": "your-voyage-api-key",
+        "DOWMIND_VOYAGE_MODEL": "voyage-4"
       }
     }
   }
@@ -113,13 +113,13 @@ Claude Code (`~/.claude.json` atau `.mcp.json`):
 
 ### Build binary
 ```bash
-cd /Users/enowdev/Project/enowx-rag/mcp-server
+cd ~/Project/dow-mind/mcp-server
 go build ./cmd/mcp-server
 ```
 
 ### Backend lokal (kalau tak pakai Voyage/Qdrant cloud)
 ```bash
-cd /Users/enowdev/Project/enowx-rag/mcp-server
+cd ~/Project/dow-mind/mcp-server
 docker compose up -d qdrant tei-embedding
 # verify
 curl -f http://localhost:6333/healthz
@@ -134,16 +134,16 @@ Format config untuk tool lain (Cursor, Zed, Windsurf, Codex, dll) ada lengkap di
 
 | Variable | Default | Keterangan |
 |---|---|---|
-| `RAG_VECTOR_STORE` | `qdrant` | `qdrant` \| `chroma` \| `pgvector` |
-| `RAG_EMBEDDER` | `voyage` | `voyage` \| `tei` (fallback ke `tei` jika `RAG_VOYAGE_API_KEY` kosong) |
-| `RAG_QDRANT_URL` | `http://localhost:6333` | Qdrant REST URL |
-| `RAG_QDRANT_API_KEY` | — | opsional, Qdrant cloud |
-| `RAG_CHROMA_URL` | `http://localhost:8000` | Chroma REST URL |
-| `RAG_PGVECTOR_DSN` | — | Postgres connection string |
-| `RAG_TEI_URL` | `http://localhost:8081` | TEI URL |
-| `RAG_VOYAGE_API_KEY` | — | wajib saat `RAG_EMBEDDER=voyage` |
-| `RAG_VOYAGE_MODEL` | `voyage-4` | model Voyage |
-| `RAG_VECTOR_DIM` | (dari model) | override dimensi vektor |
+| `DOWMIND_VECTOR_STORE` | `qdrant` | `qdrant` \| `chroma` \| `pgvector` |
+| `DOWMIND_EMBEDDER` | `voyage` | `voyage` \| `tei` (fallback ke `tei` jika `DOWMIND_VOYAGE_API_KEY` kosong) |
+| `DOWMIND_QDRANT_URL` | `http://localhost:6333` | Qdrant REST URL |
+| `DOWMIND_QDRANT_API_KEY` | — | opsional, Qdrant cloud |
+| `DOWMIND_CHROMA_URL` | `http://localhost:8000` | Chroma REST URL |
+| `DOWMIND_PGVECTOR_DSN` | — | Postgres connection string |
+| `DOWMIND_TEI_URL` | `http://localhost:8081` | TEI URL |
+| `DOWMIND_VOYAGE_API_KEY` | — | wajib saat `DOWMIND_EMBEDDER=voyage` |
+| `DOWMIND_VOYAGE_MODEL` | `voyage-4` | model Voyage |
+| `DOWMIND_VECTOR_DIM` | (dari model) | override dimensi vektor |
 
 ---
 
@@ -182,21 +182,21 @@ Semua path relatif ke `mcp-server/`.
 ## 10. Build & test
 
 ```bash
-cd /Users/enowdev/Project/enowx-rag/mcp-server
+cd ~/Project/dow-mind/mcp-server
 go build ./cmd/mcp-server        # build
 go vet ./...                     # static check
 go test ./...                    # test (jika ada)
 ```
 
-Git: branch default `main`, remote `origin` = GitHub `enowdev/enowx-rag`. Commit/push **hanya jika diminta user**.
+Git: branch default `main`, remote `origin` = GitHub `RivaldiMurpia/dow-mind`. Commit/push **hanya jika diminta user**.
 
 ---
 
 ## 11. Status saat ini & langkah berikutnya
 
 Sudah beres:
-- [x] Project ter-index ke RAG (`project_enowx-rag`).
-- [x] Skill terpasang (`~/.factory/skills/enowx-rag/skill.md`).
+- [x] Project ter-index ke RAG (`project_dow-mind`).
+- [x] Skill terpasang (`~/.factory/skills/dow-mind/skill.md`).
 - [x] `AGENTS.md` + `CLAUDE.md` di root.
 - [x] Planning detail: `docs/PLANNING.md`.
 - [x] Mockup dashboard (approved): `docs/mockups/dashboard.html`.
@@ -214,5 +214,5 @@ Belum:
 - [`PLANNING.md`](./PLANNING.md) — spesifikasi implementasi lengkap + contoh kode.
 - [`mockups/dashboard.html`](./mockups/dashboard.html) — referensi visual UI (approved).
 - [`../README.md`](../README.md) — setup guide lengkap semua tool.
-- [`../skill/enowx-rag.md`](../skill/enowx-rag.md) — skill (template AGENTS.md/CLAUDE.md).
+- [`../skill/dow-mind.md`](../skill/dow-mind.md) — skill (template AGENTS.md/CLAUDE.md).
 - [`../AGENTS.md`](../AGENTS.md) — panduan install universal.

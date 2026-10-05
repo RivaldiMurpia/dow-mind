@@ -72,10 +72,10 @@ export function Sidebar({ page, onNavigate, projects, activeProject, onSelectPro
     <aside className="sidebar">
       <div className="brand">
         <div className="brand-mark">
-          <img className="brand-img brand-img-light" src="/icon-light-512.png" alt="enowx-rag" />
+          <img className="brand-img brand-img-light" src="/icon-light-512.png" alt="dow-mind" />
           <img className="brand-img brand-img-dark" src="/icon-dark-512.png" alt="" aria-hidden="true" />
         </div>
-        <div className="brand-name">enowx<span>·rag</span></div>
+        <div className="brand-name">DOW&nbsp;Mind</div>
       </div>
 
       {navItems.map((item) => {

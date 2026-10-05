@@ -14,12 +14,12 @@ RUN go mod download
 COPY . .
 # Copy the built SPA into web/dist so embed.FS picks it up
 COPY --from=web-builder /web/dist ./web/dist
-RUN go build -trimpath -o enowx-rag ./cmd/mcp-server
+RUN go build -trimpath -o dow-mind ./cmd/mcp-server
 
 # Stage 3: Minimal runtime image
 FROM alpine:3.21
 RUN apk add --no-cache ca-certificates
 WORKDIR /app
-COPY --from=go-builder /build/enowx-rag .
+COPY --from=go-builder /build/dow-mind .
 EXPOSE 7777
-ENTRYPOINT ["./enowx-rag"]
+ENTRYPOINT ["./dow-mind"]

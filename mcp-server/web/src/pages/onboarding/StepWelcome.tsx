@@ -38,7 +38,7 @@ export function StepWelcome({ onNext }: StepWelcomeProps) {
   return (
     <div className="card">
       <div className="card-head">
-        <h2>Welcome to enowx-rag</h2>
+        <h2>Welcome to dow-mind</h2>
         <span className="step-badge mono">1 / 7</span>
         <span className="card-hint">First-run setup</span>
       </div>
@@ -69,7 +69,7 @@ export function StepWelcome({ onNext }: StepWelcomeProps) {
         <p className="welcome-explain">
           The wizard will configure: (1) vector store selection, (2) embedding provider, (3) connection
           test, (4) optional auto-setup for local Docker backends, (5) save configuration to{' '}
-          <code className="mono">~/.enowx-rag/config.yaml</code>.
+          <code className="mono">~/.dow-mind/config.yaml</code>.
         </p>
       </div>
       <div className="nav-buttons">
@@ -87,7 +87,7 @@ export function StepWelcome({ onNext }: StepWelcomeProps) {
 
 // Docker and PostgreSQL cannot be probed from a browser (no raw TCP, no shell).
 // Rather than report a misleading "available", we say so honestly and point the
-// user at the CLI (`enowx-rag setup --run`), which verifies them for real.
+// user at the CLI (`dow-mind setup --run`), which verifies them for real.
 async function checkDocker(): Promise<EnvCheck> {
   return { label: 'Docker', status: 'unknown', detail: 'verify via CLI' }
 }

@@ -1,18 +1,18 @@
 # Project agent instructions
 
-This project uses `enowx-rag` MCP server for per-project memory (RAG).
+This project uses `dow-mind` MCP server for per-project memory (RAG).
 
 ## Before you start coding
 
-1. Call `rag_retrieve_context` with the user's task/query and the project ID `PROJECT_ID`.
+1. Call `mind_retrieve_context` with the user's task/query and the project ID `PROJECT_ID`.
 2. Read the returned context. If it is empty or irrelevant, continue as normal.
 3. If the context changes how you would approach the task, explain the relevant insights briefly.
 
 ## After you finish coding
 
 1. Summarize what you changed and why.
-2. Call `rag_index` with useful new facts, design decisions, gotchas, or patterns under project ID `PROJECT_ID`.
-3. Call `rag_index_project` with the project directory to sync all file changes into RAG. Always do this — it handles new files, edits, and deletions automatically.
+2. Call `mind_index` with useful new facts, design decisions, gotchas, or patterns under project ID `PROJECT_ID`.
+3. Call `mind_index_project` with the project directory to sync all file changes into RAG. Always do this — it handles new files, edits, and deletions automatically.
 4. Keep chunks focused and concise (one idea per chunk). Include metadata tags when helpful.
 
 ## Project ID

@@ -1,7 +1,7 @@
 .PHONY: web build dev-web dev-api mcp test vet clean placeholder
 
 # Go binary output name
-BINARY := enowx-rag
+BINARY := dow-mind
 
 # Directories
 MCP_DIR := mcp-server
@@ -26,7 +26,7 @@ build: web
 mcp:
 	@if [ ! -d $(WEB_DIR)/dist ]; then \
 		mkdir -p $(WEB_DIR)/dist; \
-		echo '<!DOCTYPE html><html><body>enowx-rag UI not built. Run make web to build the SPA.</body></html>' > $(WEB_DIR)/dist/index.html; \
+		echo '<!DOCTYPE html><html><body>dow-mind UI not built. Run make web to build the SPA.</body></html>' > $(WEB_DIR)/dist/index.html; \
 		echo "Created web/dist placeholder for MCP-only build"; \
 	fi
 	cd $(MCP_DIR) && go build $(GO_FLAGS) -o mcp-server ./cmd/mcp-server
@@ -52,7 +52,7 @@ vet:
 placeholder:
 	@if [ ! -f $(WEB_DIR)/dist/index.html ]; then \
 		mkdir -p $(WEB_DIR)/dist; \
-		echo '<!DOCTYPE html><html><body>enowx-rag UI not built. Run make web to build the SPA.</body></html>' > $(WEB_DIR)/dist/index.html; \
+		echo '<!DOCTYPE html><html><body>dow-mind UI not built. Run make web to build the SPA.</body></html>' > $(WEB_DIR)/dist/index.html; \
 		echo "Created web/dist placeholder"; \
 	else \
 		echo "web/dist/index.html already exists"; \

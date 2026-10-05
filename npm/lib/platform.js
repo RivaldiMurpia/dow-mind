@@ -1,4 +1,4 @@
-// Shared platform resolution for the enowx-rag npm wrapper.
+// Shared platform resolution for the dow-mind npm wrapper.
 // Maps Node's process.platform/arch to the GoReleaser archive naming and the
 // on-disk binary path, so install.js and the bin launcher agree.
 'use strict'
@@ -15,7 +15,7 @@ function resolveTarget() {
   if (!os || !arch) {
     throw new Error(
       `unsupported platform: ${process.platform}/${process.arch}. ` +
-        `Install a prebuilt binary from https://github.com/enowdev/enowx-rag/releases`
+        `Install a prebuilt binary from https://github.com/RivaldiMurpia/dow-mind/releases`
     )
   }
   // GoReleaser skips windows/arm64.
@@ -26,7 +26,7 @@ function resolveTarget() {
 }
 
 function binaryName() {
-  return process.platform === 'win32' ? 'enowx-rag.exe' : 'enowx-rag'
+  return process.platform === 'win32' ? 'dow-mind.exe' : 'dow-mind'
 }
 
 // Where the downloaded binary is cached inside the installed package.
@@ -38,7 +38,7 @@ function binaryPath() {
 function archiveFor(version, os, arch) {
   const v = version.replace(/^v/, '')
   const ext = os === 'windows' ? 'zip' : 'tar.gz'
-  return `enowx-rag_${v}_${os}_${arch}.${ext}`
+  return `dow-mind_${v}_${os}_${arch}.${ext}`
 }
 
 module.exports = { resolveTarget, binaryName, binaryPath, archiveFor }

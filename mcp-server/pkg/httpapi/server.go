@@ -1,4 +1,4 @@
-// Package httpapi provides the HTTP API layer for enowx-rag. It exposes
+// Package httpapi provides the HTTP API layer for dow-mind. It exposes
 // REST endpoints and an SSE event stream over a chi router, serving both
 // the API and an embedded React SPA from a single binary.
 package httpapi
@@ -7,7 +7,7 @@ import (
 	"io/fs"
 	"net/http"
 
-	"github.com/enowdev/enowx-rag/pkg/core"
+	"github.com/RivaldiMurpia/dow-mind/pkg/core"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
@@ -15,8 +15,8 @@ import (
 // NewRouter creates a chi router with all API routes and SPA fallback.
 // svc is the core service layer shared with MCP stdio mode.
 // ui is the embedded filesystem containing the SPA dist (index.html + assets).
-// mcpHandler, when non-nil, is mounted at /mcp so agents can use enowx-rag as a
-// remote MCP server; it is gated by the same RAG_ADMIN_TOKEN as /api.
+// mcpHandler, when non-nil, is mounted at /mcp so agents can use dow-mind as a
+// remote MCP server; it is gated by the same DOWMIND_ADMIN_TOKEN as /api.
 func NewRouter(svc *core.Service, ui fs.FS, mcpHandler http.Handler) http.Handler {
 	h := &Handlers{svc: svc}
 
@@ -29,7 +29,7 @@ func NewRouter(svc *core.Service, ui fs.FS, mcpHandler http.Handler) http.Handle
 	// LocalOrAdminMiddleware's localhost check on the setup endpoints.
 
 	// API routes — protected by optional admin token middleware.
-	// When RAG_ADMIN_TOKEN is set, all /api/* endpoints require an
+	// When DOWMIND_ADMIN_TOKEN is set, all /api/* endpoints require an
 	// Authorization: Bearer <token> header. When unset, no auth is required.
 	r.Route("/api", func(r chi.Router) {
 		r.Use(AdminTokenMiddleware)

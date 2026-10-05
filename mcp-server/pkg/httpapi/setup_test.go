@@ -10,20 +10,20 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/enowdev/enowx-rag/pkg/core"
+	"github.com/RivaldiMurpia/dow-mind/pkg/core"
 )
 
-// helperClearRagEnv unsets all RAG_ env vars that could interfere with
+// helperClearRagEnv unsets all DOWMIND_ env vars that could interfere with
 // config tests and returns a cleanup function.
 func helperClearRagEnv(t *testing.T) func() {
 	t.Helper()
 	keys := []string{
-		"RAG_VECTOR_STORE", "RAG_EMBEDDER",
-		"RAG_QDRANT_URL", "RAG_QDRANT_API_KEY",
-		"RAG_CHROMA_URL", "RAG_PGVECTOR_DSN",
-		"RAG_TEI_URL",
-		"RAG_VOYAGE_API_KEY", "RAG_VOYAGE_MODEL", "RAG_VECTOR_DIM",
-		"RAG_RERANKER_MODEL",
+		"DOWMIND_VECTOR_STORE", "DOWMIND_EMBEDDER",
+		"DOWMIND_QDRANT_URL", "DOWMIND_QDRANT_API_KEY",
+		"DOWMIND_CHROMA_URL", "DOWMIND_PGVECTOR_DSN",
+		"DOWMIND_TEI_URL",
+		"DOWMIND_VOYAGE_API_KEY", "DOWMIND_VOYAGE_MODEL", "DOWMIND_VECTOR_DIM",
+		"DOWMIND_RERANKER_MODEL",
 	}
 	saved := make(map[string]string)
 	for _, k := range keys {
@@ -83,7 +83,7 @@ func TestSetupStatus_Configured(t *testing.T) {
 	t.Setenv("HOME", tmpDir)
 
 	// Create the config file so that os.Stat finds it.
-	configDir := filepath.Join(tmpDir, ".enowx-rag")
+	configDir := filepath.Join(tmpDir, ".dow-mind")
 	if err := os.MkdirAll(configDir, 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +160,7 @@ func TestSetupStatus_Transitions(t *testing.T) {
 // --- POST /api/setup/apply ---
 
 // TestSetupApply_SavesConfigWith0600 verifies that POST /api/setup/apply
-// saves the config to ~/.enowx-rag/config.yaml with chmod 0600.
+// saves the config to ~/.dow-mind/config.yaml with chmod 0600.
 func TestSetupApply_SavesConfigWith0600(t *testing.T) {
 	cleanup := helperClearRagEnv(t)
 	defer cleanup()
@@ -171,7 +171,7 @@ func TestSetupApply_SavesConfigWith0600(t *testing.T) {
 	p := &mockProvider{}
 	_, router := newTestServer(t, p, nil)
 
-	body := `{"vector_store":"pgvector","embedder":"voyage","voyage_api_key":"secret-key","voyage_model":"voyage-4","voyage_dim":1024,"pgvector_dsn":"postgresql://enowdev@localhost:5432/enowxrag"}`
+	body := `{"vector_store":"pgvector","embedder":"voyage","voyage_api_key":"secret-key","voyage_model":"voyage-4","voyage_dim":1024,"pgvector_dsn":"postgresql://RivaldiMurpia@localhost:5432/dowmindrag"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/setup/apply", strings.NewReader(body))
 	req.RemoteAddr = "127.0.0.1:12345"
 	req.Header.Set("Content-Type", "application/json")
@@ -183,7 +183,7 @@ func TestSetupApply_SavesConfigWith0600(t *testing.T) {
 	}
 
 	// Verify file exists with 0600 permissions.
-	configPath := filepath.Join(tmpDir, ".enowx-rag", "config.yaml")
+	configPath := filepath.Join(tmpDir, ".dow-mind", "config.yaml")
 	info, err := os.Stat(configPath)
 	if err != nil {
 		t.Fatalf("config file not created: %v", err)
@@ -215,7 +215,7 @@ func TestSetupApply_WritesValidYAML(t *testing.T) {
 	p := &mockProvider{}
 	_, router := newTestServer(t, p, nil)
 
-	body := `{"vector_store":"pgvector","embedder":"voyage","voyage_api_key":"my-key","voyage_model":"voyage-4","voyage_dim":1024,"pgvector_dsn":"postgresql://enowdev@localhost:5432/enowxrag","qdrant_url":"http://localhost:6333","reranker_model":"rerank-2.5"}`
+	body := `{"vector_store":"pgvector","embedder":"voyage","voyage_api_key":"my-key","voyage_model":"voyage-4","voyage_dim":1024,"pgvector_dsn":"postgresql://RivaldiMurpia@localhost:5432/dowmindrag","qdrant_url":"http://localhost:6333","reranker_model":"rerank-2.5"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/setup/apply", strings.NewReader(body))
 	req.RemoteAddr = "127.0.0.1:12345"
 	req.Header.Set("Content-Type", "application/json")
@@ -227,7 +227,7 @@ func TestSetupApply_WritesValidYAML(t *testing.T) {
 	}
 
 	// Read the file and verify it's valid YAML with correct values.
-	data, err := os.ReadFile(filepath.Join(tmpDir, ".enowx-rag", "config.yaml"))
+	data, err := os.ReadFile(filepath.Join(tmpDir, ".dow-mind", "config.yaml"))
 	if err != nil {
 		t.Fatalf("failed to read config file: %v", err)
 	}
@@ -304,7 +304,7 @@ func TestSetupApply_OverwritesExisting(t *testing.T) {
 	t.Setenv("HOME", tmpDir)
 
 	// Pre-create a config file with different values and wider permissions.
-	configDir := filepath.Join(tmpDir, ".enowx-rag")
+	configDir := filepath.Join(tmpDir, ".dow-mind")
 	os.MkdirAll(configDir, 0700)
 	configPath := filepath.Join(configDir, "config.yaml")
 	os.WriteFile(configPath, []byte("vector_store: old\n"), 0644)
@@ -629,7 +629,7 @@ func TestParsePGDSN_URLFormat(t *testing.T) {
 		wantHost string
 		wantPort string
 	}{
-		{"postgresql://enowdev@localhost:5432/enowxrag", "localhost", "5432"},
+		{"postgresql://RivaldiMurpia@localhost:5432/dowmindrag", "localhost", "5432"},
 		{"postgresql://admin@db.example.com:6543/mydb", "db.example.com", "6543"},
 		{"postgres://localhost/mydb", "localhost", "5432"},
 		{"postgresql://localhost:5432", "localhost", "5432"},
@@ -670,7 +670,7 @@ func TestParsePGDSN_Empty(t *testing.T) {
 // request to /api/setup/apply is rejected (403) when no admin token is set,
 // so an exposed instance cannot have its config rewritten anonymously.
 func TestSetupApply_RemoteRejectedWithoutToken(t *testing.T) {
-	t.Setenv("RAG_ADMIN_TOKEN", "")
+	t.Setenv("DOWMIND_ADMIN_TOKEN", "")
 	p := &mockProvider{}
 	_, router := newTestServer(t, p, nil)
 
@@ -692,7 +692,7 @@ func TestSetupApply_RemoteAllowedWithToken(t *testing.T) {
 	_, router := newTestServer(t, p, nil)
 	// Set token AFTER newTestServer (which clears it for isolation). Auth is
 	// read per-request.
-	t.Setenv("RAG_ADMIN_TOKEN", "s3cret")
+	t.Setenv("DOWMIND_ADMIN_TOKEN", "s3cret")
 
 	body := `{"vector_store":"qdrant","embedder":"voyage","voyage_api_key":"k"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/setup/apply", strings.NewReader(body))
@@ -738,14 +738,14 @@ func TestInstallMCPEndpoint(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cursor config not written: %v", err)
 	}
-	if !strings.Contains(string(data), "enowx-rag") {
-		t.Error("cursor config missing enowx-rag server")
+	if !strings.Contains(string(data), "dow-mind") {
+		t.Error("cursor config missing dow-mind server")
 	}
 }
 
 // TestInstallMCPRemoteRejected verifies the endpoint is loopback-gated.
 func TestInstallMCPRemoteRejected(t *testing.T) {
-	t.Setenv("RAG_ADMIN_TOKEN", "")
+	t.Setenv("DOWMIND_ADMIN_TOKEN", "")
 	p := &mockProvider{}
 	_, router := newTestServer(t, p, nil)
 
@@ -778,14 +778,14 @@ func TestMCPSnippetEndpoint(t *testing.T) {
 	var resp map[string]any
 	json.Unmarshal(w.Body.Bytes(), &resp)
 	content, _ := resp["content"].(string)
-	if !strings.Contains(content, "[mcp_servers.enowx-rag]") {
+	if !strings.Contains(content, "[mcp_servers.dow-mind]") {
 		t.Errorf("codex snippet should be TOML, got: %s", content)
 	}
 }
 
-// writeTestConfig writes a minimal ~/.enowx-rag/config.yaml under home.
+// writeTestConfig writes a minimal ~/.dow-mind/config.yaml under home.
 func writeTestConfig(home string) error {
-	dir := filepath.Join(home, ".enowx-rag")
+	dir := filepath.Join(home, ".dow-mind")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
@@ -795,7 +795,7 @@ func writeTestConfig(home string) error {
 
 // TestMigrateEndpointRemoteRejected verifies /api/migrate is loopback-gated.
 func TestMigrateEndpointRemoteRejected(t *testing.T) {
-	t.Setenv("RAG_ADMIN_TOKEN", "")
+	t.Setenv("DOWMIND_ADMIN_TOKEN", "")
 	p := &mockProvider{}
 	_, router := newTestServer(t, p, nil)
 	body := `{"source_project":"a","dest_project":"b","vector_store":"qdrant","embedder":"voyage"}`
@@ -844,7 +844,7 @@ func TestWriteAgentsMD_CreateAndMerge(t *testing.T) {
 		t.Fatalf("create = %d, want 200", code)
 	}
 	data, _ := os.ReadFile(agentsPath)
-	if !strings.Contains(string(data), "<!-- enowx-rag:start -->") || !strings.Contains(string(data), "project: proj1") {
+	if !strings.Contains(string(data), "<!-- dow-mind:start -->") || !strings.Contains(string(data), "project: proj1") {
 		t.Errorf("created AGENTS.md missing block:\n%s", data)
 	}
 
@@ -853,7 +853,7 @@ func TestWriteAgentsMD_CreateAndMerge(t *testing.T) {
 		t.Fatalf("update = %d, want 200", code)
 	}
 	data, _ = os.ReadFile(agentsPath)
-	if strings.Count(string(data), "<!-- enowx-rag:start -->") != 1 {
+	if strings.Count(string(data), "<!-- dow-mind:start -->") != 1 {
 		t.Errorf("update should keep exactly one block:\n%s", data)
 	}
 	if !strings.Contains(string(data), "project: proj2") || strings.Contains(string(data), "project: proj1") {
@@ -882,15 +882,15 @@ func TestWriteAgentsMD_AppendPreservesUserContent(t *testing.T) {
 	if !strings.Contains(string(data), "Do not break the build") {
 		t.Error("user content was lost")
 	}
-	if !strings.Contains(string(data), "<!-- enowx-rag:start -->") {
-		t.Error("enowx-rag block was not appended")
+	if !strings.Contains(string(data), "<!-- dow-mind:start -->") {
+		t.Error("dow-mind block was not appended")
 	}
 }
 
 // TestProbeEndpoint verifies probe reports skill/agents_md status.
 func TestProbeEndpoint(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte("hi <!-- enowx-rag:start -->x<!-- enowx-rag:end -->"), 0o644)
+	os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte("hi <!-- dow-mind:start -->x<!-- dow-mind:end -->"), 0o644)
 	p := &mockProvider{}
 	_, router := newTestServer(t, p, nil)
 	req := httptest.NewRequest(http.MethodGet, "/api/setup/probe?client=cursor&dir="+dir, nil)
@@ -941,7 +941,7 @@ func TestDocsEndpoints(t *testing.T) {
 	req = httptest.NewRequest(http.MethodGet, "/api/docs/mcp-tools", nil)
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
-	if w.Code != 200 || !strings.Contains(w.Body.String(), "rag_retrieve_context") {
+	if w.Code != 200 || !strings.Contains(w.Body.String(), "mind_retrieve_context") {
 		t.Errorf("mcp-tools section wrong: %d\n%s", w.Code, w.Body.String())
 	}
 
@@ -962,7 +962,7 @@ func TestDocsEndpoints(t *testing.T) {
 	}
 }
 
-// TestMCPMount_Gated verifies /mcp is mounted and gated by RAG_ADMIN_TOKEN.
+// TestMCPMount_Gated verifies /mcp is mounted and gated by DOWMIND_ADMIN_TOKEN.
 func TestMCPMount_Gated(t *testing.T) {
 	// A trivial handler stands in for the real MCP handler.
 	dummy := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -971,7 +971,7 @@ func TestMCPMount_Gated(t *testing.T) {
 	})
 
 	// With a token set: no/invalid bearer -> 401.
-	t.Setenv("RAG_ADMIN_TOKEN", "s3cret")
+	t.Setenv("DOWMIND_ADMIN_TOKEN", "s3cret")
 	router := NewRouter(core.NewService(&mockProvider{}, nil, nil), nil, dummy)
 	req := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader("{}"))
 	w := httptest.NewRecorder()
@@ -994,7 +994,7 @@ func TestMCPMount_Gated(t *testing.T) {
 // token is set (local use).
 func TestMCPMount_OpenWhenNoToken(t *testing.T) {
 	t.Setenv("HOME", t.TempDir()) // no config token
-	t.Setenv("RAG_ADMIN_TOKEN", "")
+	t.Setenv("DOWMIND_ADMIN_TOKEN", "")
 	dummy := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
 	router := NewRouter(core.NewService(&mockProvider{}, nil, nil), nil, dummy)
 	req := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader("{}"))
@@ -1034,7 +1034,7 @@ func TestSetupConfig_Masked(t *testing.T) {
 func TestGenToken_SavesAndGates(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
-	t.Setenv("RAG_ADMIN_TOKEN", "") // ensure config value is the effective one
+	t.Setenv("DOWMIND_ADMIN_TOKEN", "") // ensure config value is the effective one
 	if err := writeTestConfig(tmp); err != nil {
 		t.Fatalf("write config: %v", err)
 	}

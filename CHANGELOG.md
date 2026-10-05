@@ -7,39 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Forked as DOW Mind
+- Forked from `enowdev/enowx-rag` (Apache 2.0, attribution retained in [NOTICE](NOTICE)) and rebranded to **DOW Mind** (`RivaldiMurpia/dow-mind`): binary `dow-mind`, MCP tools renamed `rag_*` → `mind_*`, env vars `RAG_*` → `DOWMIND_*`, config dir `~/.dow-mind`, dashboard retitled.
+- **P0 hardening (this fork):** secret-file denylist (`.env` and friends are never indexed), secure-by-default serve mode, `.gitignore`-aware file walker, overlapping code chunks.
+- **P1 (this fork):** file watcher with auto re-index, code-aware chunk splitting, pluggable rerankers (beyond Voyage).
+
 ### Added
 - **One-line install + prebuilt binaries**: releases now ship cross-compiled,
   CGO-free binaries for macOS/Linux (amd64/arm64) and Windows (amd64) via
   GoReleaser (`.github/workflows/release.yml` on tag `v*`). Install without a
   toolchain through the `install.sh` script (`curl -fsSL …/install.sh | sh`),
-  Homebrew (`brew install enowdev/tap/enowx-rag`), npm (`npm install -g
-  enowx-rag`, a thin wrapper that fetches the native binary), `go install
+  Homebrew (`brew install RivaldiMurpia/tap/dow-mind`), npm (`npm install -g
+  dow-mind`, a thin wrapper that fetches the native binary), `go install
   …/cmd/mcp-server@latest` (the dashboard is embedded from a committed build),
-  or by downloading a release archive directly. Adds `enowx-rag version`
+  or by downloading a release archive directly. Adds `dow-mind version`
   (`--version`), with the version stamped at build time via ldflags.
 - **Settings page** to manage API keys and the admin token from the dashboard:
   view keys masked (`GET /api/setup/config`), reveal full keys
   (`/config/reveal`, localhost or admin token), update a key
   (`POST /api/setup/config`, merged into config.yaml 0600), and generate an
   admin token (`POST /api/setup/gen-token`, shown once, saved to config). The
-  admin token now takes effect from either `RAG_ADMIN_TOKEN` (precedence) or the
+  admin token now takes effect from either `DOWMIND_ADMIN_TOKEN` (precedence) or the
   saved config, read per-request so a generated token works without a restart.
-- **More MCP tools** (6 → 11): `rag_list_projects` (discover projects + chunk
-  counts), `rag_project_exists`, `rag_list_points` (inspect indexed chunks),
-  `rag_delete_points` (remove stale chunks without a full re-index), and
-  `rag_stats` (projects/chunks/embed-model/latency/tokens). Thin wrappers over
+- **More MCP tools** (6 → 11): `mind_list_projects` (discover projects + chunk
+  counts), `mind_project_exists`, `mind_list_points` (inspect indexed chunks),
+  `mind_delete_points` (remove stale chunks without a full re-index), and
+  `mind_stats` (projects/chunks/embed-model/latency/tokens). Thin wrappers over
   existing core.Service methods; available over stdio and remote HTTP.
-- **MCP over HTTP (remote daemon)**: `enowx-rag --serve` now also exposes the MCP
+- **MCP over HTTP (remote daemon)**: `dow-mind --serve` now also exposes the MCP
   server at `/mcp` (Streamable HTTP transport, stateless), so agents can use
-  enowx-rag as a centralized remote daemon — e.g. on a VPS — instead of a local
-  stdio process. It's gated by the same `RAG_ADMIN_TOKEN` bearer as `/api`.
+  dow-mind as a centralized remote daemon — e.g. on a VPS — instead of a local
+  stdio process. It's gated by the same `DOWMIND_ADMIN_TOKEN` bearer as `/api`.
   Connect a client with `{ "url": ".../mcp", "headers": { "Authorization":
   "Bearer <token>" } }`. Local stdio mode is unchanged.
 - **Agent setup**: point an AI agent at `GET /api/docs/setup` and it configures
-  enowx-rag for a project, idempotently. `GET /api/setup/probe` reports what's
+  dow-mind for a project, idempotently. `GET /api/setup/probe` reports what's
   already installed (MCP per client, skill, AGENTS.md block) so finished steps
-  are skipped; `POST /api/setup/write-agents-md` merges an enowx-rag section into
-  the project's AGENTS.md via `<!-- enowx-rag:start/end -->` markers (create /
+  are skipped; `POST /api/setup/write-agents-md` merges an dow-mind section into
+  the project's AGENTS.md via `<!-- dow-mind:start/end -->` markers (create /
   append / update, preserving the user's own content). The Install step shows a
   short copy-paste prompt.
 - **Migration** page + engine: re-embed a project's stored text into a new
@@ -52,17 +57,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   verified (reuses the tested Qdrant provider); Pinecone, Weaviate, and Chroma
   Cloud connectors are **experimental** (built from vendor docs, mock-tested
   only — not verified against a live account) and labelled as such in the UI.
-- OpenAI-compatible embedder (`RAG_EMBEDDER=openai`): works with any
+- OpenAI-compatible embedder (`DOWMIND_EMBEDDER=openai`): works with any
   `/v1/embeddings` API — OpenAI, Together, Jina, Mistral, a local Ollama,
-  LiteLLM, etc. — via `RAG_OPENAI_BASE_URL` / `RAG_OPENAI_MODEL` /
-  `RAG_OPENAI_API_KEY` / `RAG_OPENAI_DIM`. Surfaced in the wizard's Embedding
+  LiteLLM, etc. — via `DOWMIND_OPENAI_BASE_URL` / `DOWMIND_OPENAI_MODEL` /
+  `DOWMIND_OPENAI_API_KEY` / `DOWMIND_OPENAI_DIM`. Surfaced in the wizard's Embedding
   step, which also clarifies that TEI serves any local model.
 - Query metrics: latency (avg/p50/p95), Voyage token usage, and dense/lexical
   retrieval breakdown, exposed at `GET /api/metrics` and shown on the dashboard.
-  Persisted durably to `~/.enowx-rag/metrics.db` (pure-Go SQLite, no cgo), so
+  Persisted durably to `~/.dow-mind/metrics.db` (pure-Go SQLite, no cgo), so
   metrics survive restarts on any backend.
 - `compress` search option: deterministic near-duplicate result dedup.
-- `enowx-rag setup [--run]` CLI subcommand to generate/run the backend
+- `dow-mind setup [--run]` CLI subcommand to generate/run the backend
   docker-compose (never over HTTP).
 - Efficient project chunk counts (`points/count` / `COUNT(*)` / `/count`),
   making `/api/projects` and `/api/stats` fast on large Qdrant/pgvector.
@@ -70,7 +75,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   backends, not only pgvector.
 
 ### Changed
-- MCP `rag_semantic_search` / `rag_retrieve_context` now accept and apply
+- MCP `mind_semantic_search` / `mind_retrieve_context` now accept and apply
   `hybrid`/`rerank`/`recall`/`compress` (hybrid & rerank default on).
 - Dashboard shows only real, backend-sourced data — removed all mock/hardcoded
   metrics, dead controls, and the fake auto-setup simulation.
@@ -108,16 +113,16 @@ coding agents, distributed as a single self-contained binary.
   testing.
 - **Incremental indexing**: `content_hash` / `chunk_version` metadata so
   unchanged chunks are skipped on re-index; `embed_model`/`embed_dim` recorded.
-- **Auth**: optional `RAG_ADMIN_TOKEN` protecting `/api/*` with constant-time
+- **Auth**: optional `DOWMIND_ADMIN_TOKEN` protecting `/api/*` with constant-time
   comparison.
 - **Packaging**: Makefile build pipeline and an all-in-one Docker Compose.
 
 ### Security
 
 - SSE event stream (`/api/events`) is same-origin only by default; cross-origin
-  access must be explicitly enabled via `RAG_CORS_ORIGIN`.
+  access must be explicitly enabled via `DOWMIND_CORS_ORIGIN`.
 - Reranked result sets are defensively truncated to `k` regardless of the
   rerank API response.
 
-[Unreleased]: https://github.com/enowdev/enowx-rag/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/enowdev/enowx-rag/releases/tag/v0.1.0
+[Unreleased]: https://github.com/RivaldiMurpia/dow-mind/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/RivaldiMurpia/dow-mind/releases/tag/v0.1.0

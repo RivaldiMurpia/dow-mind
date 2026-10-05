@@ -1,4 +1,4 @@
-module github.com/enowdev/enowx-rag
+module github.com/RivaldiMurpia/dow-mind
 
 go 1.26
 

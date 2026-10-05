@@ -12,13 +12,13 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/enowdev/enowx-rag/pkg/config"
-	"github.com/enowdev/enowx-rag/pkg/core"
-	"github.com/enowdev/enowx-rag/pkg/httpapi"
-	"github.com/enowdev/enowx-rag/pkg/indexer"
-	"github.com/enowdev/enowx-rag/pkg/rag"
-	"github.com/enowdev/enowx-rag/pkg/ragbuild"
-	"github.com/enowdev/enowx-rag/web"
+	"github.com/RivaldiMurpia/dow-mind/pkg/config"
+	"github.com/RivaldiMurpia/dow-mind/pkg/core"
+	"github.com/RivaldiMurpia/dow-mind/pkg/httpapi"
+	"github.com/RivaldiMurpia/dow-mind/pkg/indexer"
+	"github.com/RivaldiMurpia/dow-mind/pkg/rag"
+	"github.com/RivaldiMurpia/dow-mind/pkg/ragbuild"
+	"github.com/RivaldiMurpia/dow-mind/web"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -33,7 +33,7 @@ var version = "dev"
 
 // resolvedVersion returns the ldflags-injected version when set, otherwise it
 // falls back to the module version recorded in the binary's build info. That
-// fallback makes `go install github.com/enowdev/enowx-rag/...@v0.1.0` report
+// fallback makes `go install github.com/RivaldiMurpia/dow-mind/...@v0.1.0` report
 // "v0.1.0" even though it doesn't pass our -ldflags.
 func resolvedVersion() string {
 	if version != "dev" {
@@ -49,7 +49,7 @@ func resolvedVersion() string {
 
 // RuntimeConfig holds the resolved configuration used to build the service
 // layer. It is populated from three sources with strict priority:
-// environment variables > config file (~/.enowx-rag/config.yaml) > defaults.
+// environment variables > config file (~/.dow-mind/config.yaml) > defaults.
 type RuntimeConfig struct {
 	VectorStore   string
 	Embedder      string
@@ -97,7 +97,7 @@ func resolveConfig() (*RuntimeConfig, error) {
 
 	// Fall back to tei if voyage key is missing and embedder wasn't set
 	// explicitly via env var. This preserves the original main.go behavior.
-	if rc.Embedder == "voyage" && rc.VoyageAPIKey == "" && os.Getenv("RAG_EMBEDDER") == "" {
+	if rc.Embedder == "voyage" && rc.VoyageAPIKey == "" && os.Getenv("DOWMIND_EMBEDDER") == "" {
 		rc.Embedder = "tei"
 	}
 
@@ -187,7 +187,7 @@ type ScanProjectInput struct {
 	Directory string `json:"directory" jsonschema:"Absolute path to the project directory to scan and index"`
 }
 
-// EmptyInput is used by tools that take no arguments (e.g. rag_list_projects).
+// EmptyInput is used by tools that take no arguments (e.g. mind_list_projects).
 type EmptyInput struct{}
 
 type ProjectIDInput struct {
@@ -206,15 +206,15 @@ type DeletePointsInput struct {
 
 func main() {
 	// Subcommand dispatch (must run before flag.Parse, which only handles the
-	// default mode's flags). `enowx-rag setup [--run]` generates/runs the
+	// default mode's flags). `dow-mind setup [--run]` generates/runs the
 	// docker-compose backend from the command line — never over HTTP.
 	if len(os.Args) > 1 && os.Args[1] == "setup" {
 		runSetup(os.Args[2:])
 		return
 	}
-	// `enowx-rag version` / `--version` / `-v` prints the build version.
+	// `dow-mind version` / `--version` / `-v` prints the build version.
 	if len(os.Args) > 1 && (os.Args[1] == "version" || os.Args[1] == "--version" || os.Args[1] == "-v") {
-		fmt.Printf("enowx-rag %s\n", resolvedVersion())
+		fmt.Printf("dow-mind %s\n", resolvedVersion())
 		return
 	}
 
@@ -271,11 +271,11 @@ func main() {
 	runStdio(svc, cfg)
 }
 
-// newMCPServer builds an *mcp.Server with all enowx-rag tools registered. It is
+// newMCPServer builds an *mcp.Server with all dow-mind tools registered. It is
 // shared by both transports: stdio (single session) and the streamable HTTP
 // handler (many concurrent sessions).
 func newMCPServer(svc *core.Service) *mcp.Server {
-	server := mcp.NewServer(&mcp.Implementation{Name: "enowx-rag", Version: resolvedVersion()}, &mcp.ServerOptions{
+	server := mcp.NewServer(&mcp.Implementation{Name: "dow-mind", Version: resolvedVersion()}, &mcp.ServerOptions{
 		Instructions: "Per-project RAG memory: create collections, index project documents, and retrieve/semantic-search context. Connects to Qdrant/Chroma/pgvector with TEI embeddings.",
 	})
 	registerMCPTools(server, svc)
@@ -288,15 +288,15 @@ func runStdio(svc *core.Service, cfg *RuntimeConfig) {
 	server := newMCPServer(svc)
 
 	// Log tool configuration to stderr so it doesn't interfere with stdio transport.
-	fmt.Fprintf(os.Stderr, "enowx-rag mcp-server ready: vector_store=%s embedder=%s\n", cfg.VectorStore, cfg.Embedder)
+	fmt.Fprintf(os.Stderr, "dow-mind mcp-server ready: vector_store=%s embedder=%s\n", cfg.VectorStore, cfg.Embedder)
 	if err := server.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
 		log.Fatal(err)
 	}
 }
 
 // runHTTP starts the HTTP API + SPA server on the given address, and also mounts
-// the MCP server over HTTP at /mcp so agents can use enowx-rag as a remote
-// daemon (behind RAG_ADMIN_TOKEN when set).
+// the MCP server over HTTP at /mcp so agents can use dow-mind as a remote
+// daemon (behind DOWMIND_ADMIN_TOKEN when set).
 func runHTTP(svc *core.Service, addr string, cfg *RuntimeConfig) {
 	// Extract the dist subdirectory from the embedded filesystem.
 	distFS, err := fs.Sub(web.Dist, "dist")
@@ -314,11 +314,11 @@ func runHTTP(svc *core.Service, addr string, cfg *RuntimeConfig) {
 
 	handler := httpapi.NewRouter(svc, distFS, mcpHandler)
 
-	authNote := "open (no RAG_ADMIN_TOKEN set)"
-	if os.Getenv("RAG_ADMIN_TOKEN") != "" {
-		authNote = "requires Authorization: Bearer <RAG_ADMIN_TOKEN>"
+	authNote := "open (no DOWMIND_ADMIN_TOKEN set)"
+	if os.Getenv("DOWMIND_ADMIN_TOKEN") != "" {
+		authNote = "requires Authorization: Bearer <DOWMIND_ADMIN_TOKEN>"
 	}
-	fmt.Fprintf(os.Stderr, "enowx-rag HTTP server starting on %s: vector_store=%s embedder=%s; MCP at /mcp (%s)\n", addr, cfg.VectorStore, cfg.Embedder, authNote)
+	fmt.Fprintf(os.Stderr, "dow-mind HTTP server starting on %s: vector_store=%s embedder=%s; MCP at /mcp (%s)\n", addr, cfg.VectorStore, cfg.Embedder, authNote)
 	if err := http.ListenAndServe(addr, handler); err != nil {
 		log.Fatalf("HTTP server error: %v", err)
 	}
@@ -329,7 +329,7 @@ func runHTTP(svc *core.Service, addr string, cfg *RuntimeConfig) {
 // are made inside the closures.
 func registerMCPTools(server *mcp.Server, svc *core.Service) {
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        "rag_create_project",
+		Name:        "mind_create_project",
 		Description: "Create a new RAG collection for a project. Safe to call if collection already exists.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in CreateProjectInput) (*mcp.CallToolResult, any, error) {
 		if err := svc.CreateProject(ctx, in.ProjectID); err != nil {
@@ -339,7 +339,7 @@ func registerMCPTools(server *mcp.Server, svc *core.Service) {
 	})
 
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        "rag_delete_project",
+		Name:        "mind_delete_project",
 		Description: "Delete the RAG collection for a project and all its indexed memory.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in DeleteProjectInput) (*mcp.CallToolResult, any, error) {
 		if err := svc.DeleteProject(ctx, in.ProjectID); err != nil {
@@ -349,7 +349,7 @@ func registerMCPTools(server *mcp.Server, svc *core.Service) {
 	})
 
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        "rag_index",
+		Name:        "mind_index",
 		Description: "Index documents into a project collection. Each document is embedded and stored as a retrievable chunk.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in IndexProjectInput) (*mcp.CallToolResult, any, error) {
 		docs := make([]rag.Document, len(in.Documents))
@@ -363,7 +363,7 @@ func registerMCPTools(server *mcp.Server, svc *core.Service) {
 	})
 
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        "rag_semantic_search",
+		Name:        "mind_semantic_search",
 		Description: "Semantic search over a project collection. Returns the most relevant chunks with similarity scores.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in SemanticSearchInput) (*mcp.CallToolResult, any, error) {
 		opts := searchOptsFromMCP(in.Limit, in.Recall, in.Hybrid, in.Rerank, in.Compress)
@@ -375,7 +375,7 @@ func registerMCPTools(server *mcp.Server, svc *core.Service) {
 	})
 
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        "rag_retrieve_context",
+		Name:        "mind_retrieve_context",
 		Description: "Retrieve a compact context string for a project. Fetches top chunks and concatenates them for LLM context.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in RetrieveContextInput) (*mcp.CallToolResult, any, error) {
 		opts := searchOptsFromMCP(in.Limit, in.Recall, in.Hybrid, in.Rerank, in.Compress)
@@ -387,7 +387,7 @@ func registerMCPTools(server *mcp.Server, svc *core.Service) {
 	})
 
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        "rag_index_project",
+		Name:        "mind_index_project",
 		Description: "Scan a project directory and auto-index all code/text files into RAG. Handles insertions (new/changed files) and deletions (removed files). Skips node_modules, .git, vendor, dist, build. Run this when the codebase changes.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in ScanProjectInput) (*mcp.CallToolResult, any, error) {
 		// Use a long-lived context so large projects don't time out under the
@@ -410,7 +410,7 @@ func registerMCPTools(server *mcp.Server, svc *core.Service) {
 	})
 
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        "rag_list_projects",
+		Name:        "mind_list_projects",
 		Description: "List all RAG projects with their chunk counts. Use this to discover what memory is available before searching.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in EmptyInput) (*mcp.CallToolResult, any, error) {
 		stats, err := svc.ListProjects(ctx)
@@ -424,14 +424,14 @@ func registerMCPTools(server *mcp.Server, svc *core.Service) {
 	})
 
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        "rag_project_exists",
+		Name:        "mind_project_exists",
 		Description: "Check whether a project has any indexed memory. Useful before searching or indexing.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in ProjectIDInput) (*mcp.CallToolResult, any, error) {
 		return nil, map[string]any{"project_id": in.ProjectID, "exists": svc.ProjectExists(ctx, in.ProjectID)}, nil
 	})
 
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        "rag_list_points",
+		Name:        "mind_list_points",
 		Description: "List indexed chunks in a project (id, source file, content preview), optionally filtered by source file. Use to inspect what is stored.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in ListPointsInput) (*mcp.CallToolResult, any, error) {
 		filter := map[string]string{}
@@ -449,7 +449,7 @@ func registerMCPTools(server *mcp.Server, svc *core.Service) {
 	})
 
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        "rag_delete_points",
+		Name:        "mind_delete_points",
 		Description: "Delete specific chunks/points from a project by their IDs (e.g. to remove stale entries without a full re-index).",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in DeletePointsInput) (*mcp.CallToolResult, any, error) {
 		if err := svc.DeletePoints(ctx, in.ProjectID, in.PointIDs); err != nil {
@@ -459,7 +459,7 @@ func registerMCPTools(server *mcp.Server, svc *core.Service) {
 	})
 
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        "rag_stats",
+		Name:        "mind_stats",
 		Description: "Get aggregate RAG statistics: projects, total chunks, embedding model, query latency, and token usage.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in EmptyInput) (*mcp.CallToolResult, any, error) {
 		stats, err := svc.ListProjects(ctx)

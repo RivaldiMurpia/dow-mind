@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>enowx-rag — Onboarding Wizard Mockup</title>
+<title>dow-mind — Onboarding Wizard Mockup</title>
 <style>
   /* ---- Fonts: system stack tuned; mono is real JetBrains-like via system fallback ---- */
   :root {
@@ -387,7 +387,7 @@
 <div class="topbar">
   <div class="brand">
     <div class="brand-mark mono">e</div>
-    <div class="brand-name">enowx<span>·rag</span></div>
+    <div class="brand-name">dowmind<span>·rag</span></div>
   </div>
   <span class="brand-name" style="font-size:12px; color:var(--text-faint);">Setup Wizard</span>
   <div class="topbar-spacer"></div>
@@ -420,7 +420,7 @@
 
   <div class="card">
     <div class="card-head">
-      <h2>Welcome to enowx-rag</h2>
+      <h2>Welcome to dow-mind</h2>
       <span class="step-badge mono">1 / 6</span>
       <span class="hint">First-run setup</span>
     </div>
@@ -453,7 +453,7 @@
         </div>
       </div>
 
-      <p style="font-size:12.5px; margin-bottom:0;">The wizard will configure: (1) vector store selection, (2) embedding provider, (3) connection test, (4) optional auto-setup for local Docker backends, (5) save configuration to <code class="mono" style="font-size:12px; color:var(--text);">~/.enowx-rag/config.yaml</code>.</p>
+      <p style="font-size:12.5px; margin-bottom:0;">The wizard will configure: (1) vector store selection, (2) embedding provider, (3) connection test, (4) optional auto-setup for local Docker backends, (5) save configuration to <code class="mono" style="font-size:12px; color:var(--text);">~/.dow-mind/config.yaml</code>.</p>
     </div>
     <div class="nav-buttons">
       <button class="btn ghost" disabled><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg> Back</button>
@@ -520,7 +520,7 @@
         <label>Connection string / DSN</label>
         <div class="input">
           <svg viewBox="0 0 24 24"><path d="M12 2L2 7v10l10 5 10-5V7L12 2z"/><path d="M2 7l10 5 10-5M12 22V12"/></svg>
-          <span class="val">postgresql://enowdev@localhost:5432/enowxrag</span>
+          <span class="val">postgresql://RivaldiMurpia@localhost:5432/dowmindrag</span>
         </div>
       </div>
     </div>
@@ -651,7 +651,7 @@
         <span class="status-dot" style="background:var(--good)"></span>
         <div>
           <div class="comp-name">Vector Store <span class="mono">— pgvector</span></div>
-          <div class="msg">Connected to <code>postgresql://enowdev@localhost:5432/enowxrag</code>. pgvector extension confirmed.</div>
+          <div class="msg">Connected to <code>postgresql://RivaldiMurpia@localhost:5432/dowmindrag</code>. pgvector extension confirmed.</div>
         </div>
         <span class="latency ok">12ms</span>
       </div>
@@ -734,8 +734,8 @@
     <span class="kw">ports</span>:
       - <span class="str">"5432:5432"</span>
     <span class="kw">environment</span>:
-      POSTGRES_DB: <span class="str">enowxrag</span>
-      POSTGRES_USER: <span class="str">enowdev</span>
+      POSTGRES_DB: <span class="str">dowmindrag</span>
+      POSTGRES_USER: <span class="str">RivaldiMurpia</span>
     <span class="kw">volumes</span>:
       - pgdata:/var/lib/postgresql/data
 
@@ -752,11 +752,11 @@
 docker compose up -d postgres
 
 <span class="com"># Verify pgvector extension</span>
-psql -h localhost -U enowdev -d enowxrag \
+psql -h localhost -U RivaldiMurpia -d dowmindrag \
   -c <span class="str">"CREATE EXTENSION IF NOT EXISTS vector;"</span>
 
-<span class="com"># Start enowx-rag server</span>
-./enowx-rag --serve --addr :7777</div>
+<span class="com"># Start dow-mind server</span>
+./dow-mind --serve --addr :7777</div>
       </div>
 
       <div class="auto-run-box">
@@ -831,7 +831,7 @@ psql -h localhost -U enowdev -d enowxrag \
         </div>
         <div class="summary-row">
           <span class="sk">DSN</span>
-          <span class="sv">postgresql://enowdev@localhost:5432/enowxrag</span>
+          <span class="sv">postgresql://RivaldiMurpia@localhost:5432/dowmindrag</span>
         </div>
         <div class="summary-row">
           <span class="sk">Embedder</span>
@@ -847,7 +847,7 @@ psql -h localhost -U enowdev -d enowxrag \
         </div>
         <div class="summary-row">
           <span class="sk">Config path</span>
-          <span class="sv">~/.enowx-rag/config.yaml</span>
+          <span class="sv">~/.dow-mind/config.yaml</span>
         </div>
         <div class="summary-row">
           <span class="sk">Permissions</span>

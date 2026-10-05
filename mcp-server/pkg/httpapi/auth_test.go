@@ -7,11 +7,11 @@ import (
 )
 
 // TestAdminToken_Unset_NoAuth verifies that when no admin token is configured
-// (neither RAG_ADMIN_TOKEN nor config.yaml), requests pass through unauthenticated.
+// (neither DOWMIND_ADMIN_TOKEN nor config.yaml), requests pass through unauthenticated.
 func TestAdminToken_Unset_NoAuth(t *testing.T) {
 	// Isolate from the host: empty HOME means no config token, and clear the env.
 	t.Setenv("HOME", t.TempDir())
-	t.Setenv("RAG_ADMIN_TOKEN", "")
+	t.Setenv("DOWMIND_ADMIN_TOKEN", "")
 
 	called := false
 	h := AdminTokenMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -24,18 +24,18 @@ func TestAdminToken_Unset_NoAuth(t *testing.T) {
 	h.ServeHTTP(w, req)
 
 	if !called {
-		t.Error("expected handler to be called when RAG_ADMIN_TOKEN is unset")
+		t.Error("expected handler to be called when DOWMIND_ADMIN_TOKEN is unset")
 	}
 	if w.Code != http.StatusOK {
 		t.Errorf("expected 200, got %d", w.Code)
 	}
 }
 
-// TestAdminToken_Set_NoHeader_Returns401 verifies that when RAG_ADMIN_TOKEN
+// TestAdminToken_Set_NoHeader_Returns401 verifies that when DOWMIND_ADMIN_TOKEN
 // is set and no Authorization header is provided, the request is rejected
 // with 401.
 func TestAdminToken_Set_NoHeader_Returns401(t *testing.T) {
-	t.Setenv("RAG_ADMIN_TOKEN", "secret-token-123")
+	t.Setenv("DOWMIND_ADMIN_TOKEN", "secret-token-123")
 
 	called := false
 	h := AdminTokenMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -58,11 +58,11 @@ func TestAdminToken_Set_NoHeader_Returns401(t *testing.T) {
 	}
 }
 
-// TestAdminToken_Set_WrongToken_Returns401 verifies that when RAG_ADMIN_TOKEN
+// TestAdminToken_Set_WrongToken_Returns401 verifies that when DOWMIND_ADMIN_TOKEN
 // is set and the Authorization header contains a wrong token, the request is
 // rejected with 401.
 func TestAdminToken_Set_WrongToken_Returns401(t *testing.T) {
-	t.Setenv("RAG_ADMIN_TOKEN", "secret-token-123")
+	t.Setenv("DOWMIND_ADMIN_TOKEN", "secret-token-123")
 
 	called := false
 	h := AdminTokenMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -84,10 +84,10 @@ func TestAdminToken_Set_WrongToken_Returns401(t *testing.T) {
 }
 
 // TestAdminToken_Set_CorrectToken_PassesThrough verifies that when
-// RAG_ADMIN_TOKEN is set and the Authorization header contains the correct
+// DOWMIND_ADMIN_TOKEN is set and the Authorization header contains the correct
 // token, the request passes through to the handler.
 func TestAdminToken_Set_CorrectToken_PassesThrough(t *testing.T) {
-	t.Setenv("RAG_ADMIN_TOKEN", "secret-token-123")
+	t.Setenv("DOWMIND_ADMIN_TOKEN", "secret-token-123")
 
 	called := false
 	h := AdminTokenMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -111,7 +111,7 @@ func TestAdminToken_Set_CorrectToken_PassesThrough(t *testing.T) {
 // TestAdminToken_Set_MalformedHeader_Returns401 verifies that a malformed
 // Authorization header (not "Bearer <token>") is rejected with 401.
 func TestAdminToken_Set_MalformedHeader_Returns401(t *testing.T) {
-	t.Setenv("RAG_ADMIN_TOKEN", "secret-token-123")
+	t.Setenv("DOWMIND_ADMIN_TOKEN", "secret-token-123")
 
 	called := false
 	h := AdminTokenMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -140,7 +140,7 @@ func TestAdminToken_RouterIntegration(t *testing.T) {
 	_, router := newTestServer(t, p, nil)
 	// Set the token AFTER newTestServer (which clears it for isolation). Auth is
 	// read per-request, so this takes effect for the requests below.
-	t.Setenv("RAG_ADMIN_TOKEN", "test-admin-token")
+	t.Setenv("DOWMIND_ADMIN_TOKEN", "test-admin-token")
 
 	// Without auth header -> 401
 	req := httptest.NewRequest(http.MethodGet, "/api/projects", nil)

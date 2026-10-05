@@ -1,15 +1,15 @@
 # Binaries
 mcp-server/mcp-server
-mcp-server/enowx-rag
-enowx-rag
+mcp-server/dow-mind
+dow-mind
 mcp-server/*.exe
 
 # GoReleaser output
 /dist/
 
 # npm wrapper: the native binary is downloaded on postinstall, never committed
-npm/bin/enowx-rag
-npm/bin/enowx-rag.exe
+npm/bin/dow-mind
+npm/bin/dow-mind.exe
 npm/node_modules/
 
 # Go

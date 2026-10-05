@@ -1,61 +1,61 @@
 # docker-compose.all-in-one.yml
-# All-in-one deployment: enowx-rag server (API + UI) with optional backend services.
+# All-in-one deployment: dow-mind server (API + UI) with optional backend services.
 #
 # Usage:
 #   docker compose -f docker-compose.all-in-one.yml up -d
 #
-# The enowx-rag container serves both the REST API and the embedded React SPA
+# The dow-mind container serves both the REST API and the embedded React SPA
 # on port 7777. Backend services (Qdrant + TEI or PostgreSQL) start
 # automatically.
 #
-# To enable optional admin token auth, set RAG_ADMIN_TOKEN in the environment
+# To enable optional admin token auth, set DOWMIND_ADMIN_TOKEN in the environment
 # or uncomment the line below. When set, all /api/* endpoints require an
 # Authorization: Bearer <token> header.
 #
-# Environment variables can be customized in the enowx-rag service section below.
+# Environment variables can be customized in the dow-mind service section below.
 
 services:
-  # --- enowx-rag server (API + embedded UI) ---
-  enowx-rag:
+  # --- dow-mind server (API + embedded UI) ---
+  dow-mind:
     build:
       context: ./mcp-server
       dockerfile: Dockerfile
-    container_name: enowx-rag
+    container_name: dow-mind
     ports:
       - "7777:7777"
     environment:
       # --- Vector store: choose one ---
-      RAG_VECTOR_STORE: "qdrant"
-      # RAG_VECTOR_STORE: "pgvector"
+      DOWMIND_VECTOR_STORE: "qdrant"
+      # DOWMIND_VECTOR_STORE: "pgvector"
 
       # --- Embedder: voyage (recommended) or tei ---
-      RAG_EMBEDDER: "voyage"
-      RAG_VOYAGE_API_KEY: "${RAG_VOYAGE_API_KEY:-}"
-      RAG_VOYAGE_MODEL: "voyage-4"
-      RAG_RERANKER_MODEL: "rerank-2.5"
+      DOWMIND_EMBEDDER: "voyage"
+      DOWMIND_VOYAGE_API_KEY: "${DOWMIND_VOYAGE_API_KEY:-}"
+      DOWMIND_VOYAGE_MODEL: "voyage-4"
+      DOWMIND_RERANKER_MODEL: "rerank-2.5"
 
-      # --- Qdrant config (when RAG_VECTOR_STORE=qdrant) ---
-      RAG_QDRANT_URL: "http://qdrant:6333"
+      # --- Qdrant config (when DOWMIND_VECTOR_STORE=qdrant) ---
+      DOWMIND_QDRANT_URL: "http://qdrant:6333"
 
-      # --- pgvector config (when RAG_VECTOR_STORE=pgvector) ---
-      # RAG_PGVECTOR_DSN: "postgresql://enowxrag:enowxrag@postgres:5432/enowxrag"
+      # --- pgvector config (when DOWMIND_VECTOR_STORE=pgvector) ---
+      # DOWMIND_PGVECTOR_DSN: "postgresql://dowmindrag:dowmindrag@postgres:5432/dowmindrag"
 
-      # --- TEI config (when RAG_EMBEDDER=tei) ---
-      # RAG_TEI_URL: "http://tei-embedding:80"
+      # --- TEI config (when DOWMIND_EMBEDDER=tei) ---
+      # DOWMIND_TEI_URL: "http://tei-embedding:80"
 
       # --- Optional admin token auth (uncomment to enable) ---
-      # RAG_ADMIN_TOKEN: "change-me-to-a-random-string"
+      # DOWMIND_ADMIN_TOKEN: "change-me-to-a-random-string"
     depends_on:
       qdrant:
         condition: service_healthy
     restart: unless-stopped
-    # ENTRYPOINT in Dockerfile is ["./enowx-rag"], so command must NOT
+    # ENTRYPOINT in Dockerfile is ["./dow-mind"], so command must NOT
     # include the binary name — only the flags to pass to it.
     command: ["--serve", "--addr", ":7777"]
     healthcheck:
-      # When RAG_ADMIN_TOKEN is set, /api/* requires an Authorization header.
+      # When DOWMIND_ADMIN_TOKEN is set, /api/* requires an Authorization header.
       # Use a shell-form test so the header is sent only when the token is set.
-      test: ["CMD-SHELL", "wget --spider -q --header=\"$${RAG_ADMIN_TOKEN:+Authorization: Bearer $$RAG_ADMIN_TOKEN}\" http://localhost:7777/api/stats"]
+      test: ["CMD-SHELL", "wget --spider -q --header=\"$${DOWMIND_ADMIN_TOKEN:+Authorization: Bearer $$DOWMIND_ADMIN_TOKEN}\" http://localhost:7777/api/stats"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -63,7 +63,7 @@ services:
   # --- Qdrant vector store ---
   qdrant:
     image: qdrant/qdrant:latest
-    container_name: enowx-rag-qdrant
+    container_name: dow-mind-qdrant
     ports:
       - "6333:6333"
     volumes:
@@ -78,26 +78,26 @@ services:
   # --- Optional: PostgreSQL with pgvector (uncomment to use) ---
   # postgres:
   #   image: pgvector/pgvector:pg16
-  #   container_name: enowx-rag-postgres
+  #   container_name: dow-mind-postgres
   #   ports:
   #     - "5432:5432"
   #   environment:
-  #     POSTGRES_USER: enowxrag
-  #     POSTGRES_PASSWORD: enowxrag
-  #     POSTGRES_DB: enowxrag
+  #     POSTGRES_USER: dowmindrag
+  #     POSTGRES_PASSWORD: dowmindrag
+  #     POSTGRES_DB: dowmindrag
   #   volumes:
   #     - postgres-data:/var/lib/postgresql/data
   #   restart: unless-stopped
   #   healthcheck:
-  #     test: ["CMD-SHELL", "pg_isready -U enowxrag"]
+  #     test: ["CMD-SHELL", "pg_isready -U dowmindrag"]
   #     interval: 30s
   #     timeout: 10s
   #     retries: 3
 
-  # --- Optional: TEI embedder (uncomment when RAG_EMBEDDER=tei) ---
+  # --- Optional: TEI embedder (uncomment when DOWMIND_EMBEDDER=tei) ---
   # tei-embedding:
   #   image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.7
-  #   container_name: enowx-rag-tei
+  #   container_name: dow-mind-tei
   #   ports:
   #     - "8081:80"
   #   environment:

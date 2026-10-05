@@ -151,7 +151,7 @@ func TestQdrantListProjectIDs(t *testing.T) {
 		}
 		if r.Method == http.MethodGet && r.URL.Path == "/collections" {
 			w.Header().Set("Content-Type", "application/json")
-			w.Write([]byte(`{"result":{"collections":[{"name":"project_enowx-rag"},{"name":"project_demo"},{"name":"other_thing"}]}}`))
+			w.Write([]byte(`{"result":{"collections":[{"name":"project_dow-mind"},{"name":"project_demo"},{"name":"other_thing"}]}}`))
 			return
 		}
 		w.WriteHeader(http.StatusOK)
@@ -172,7 +172,7 @@ func TestQdrantListProjectIDs(t *testing.T) {
 	if len(ids) != 2 {
 		t.Fatalf("expected 2 project IDs, got %d: %v", len(ids), ids)
 	}
-	want := map[string]bool{"enowx-rag": true, "demo": true}
+	want := map[string]bool{"dow-mind": true, "demo": true}
 	for _, id := range ids {
 		if !want[id] {
 			t.Errorf("unexpected project ID %q", id)

@@ -1,7 +1,7 @@
 services:
   qdrant:
     image: qdrant/qdrant:latest
-    container_name: enowx-rag-qdrant
+    container_name: dow-mind-qdrant
     ports:
       - "6333:6333"
       - "6334:6334"
@@ -16,7 +16,7 @@ services:
 
   tei-embedding:
     image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.7
-    container_name: enowx-rag-tei
+    container_name: dow-mind-tei
     ports:
       - "8081:80"
     environment:
@@ -34,12 +34,12 @@ services:
 
   mcp-server:
     build: .
-    container_name: enowx-rag-mcp-server
+    container_name: dow-mind-mcp-server
     environment:
-      - RAG_VECTOR_STORE=qdrant
-      - RAG_EMBEDDER=tei
-      - RAG_QDRANT_URL=http://qdrant:6333
-      - RAG_TEI_URL=http://tei-embedding:80
+      - DOWMIND_VECTOR_STORE=qdrant
+      - DOWMIND_EMBEDDER=tei
+      - DOWMIND_QDRANT_URL=http://qdrant:6333
+      - DOWMIND_TEI_URL=http://tei-embedding:80
     depends_on:
       qdrant:
         condition: service_healthy

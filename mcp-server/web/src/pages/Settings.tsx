@@ -42,7 +42,7 @@ export function Settings() {
     }
     try {
       await api.configUpdate(patch)
-      setSaveMsg('Saved to ~/.enowx-rag/config.yaml (0600).')
+      setSaveMsg('Saved to ~/.dow-mind/config.yaml (0600).')
       setVoyageKey(''); setOpenaiKey(''); setQdrantKey('')
       setRevealed(null)
       load()
@@ -121,7 +121,7 @@ export function Settings() {
             {saveMsg && <div className="reindex-msg" style={{ marginTop: 10 }}>{saveMsg}</div>}
             <div className="field-hint" style={{ marginTop: 10 }}>
               Leave a field blank to keep the existing key. New values are written to
-              <code className="mono"> ~/.enowx-rag/config.yaml</code> (0600). Re-index is not needed for
+              <code className="mono"> ~/.dow-mind/config.yaml</code> (0600). Re-index is not needed for
               key changes, but changing the embedding <b>model/dimension</b> is.
             </div>
           </div>
@@ -137,7 +137,7 @@ export function Settings() {
             <p style={{ color: 'var(--text-dim)', fontSize: 12.5, marginTop: 0 }}>
               Gates <code className="mono">/api/*</code> and <code className="mono">/mcp</code> with a bearer
               token. Required when exposing the daemon publicly. Generate one here (stored in config), or set
-              <code className="mono"> RAG_ADMIN_TOKEN</code> in the environment (env takes precedence).
+              <code className="mono"> DOWMIND_ADMIN_TOKEN</code> in the environment (env takes precedence).
             </p>
 
             <button className="btn primary" onClick={generate}>
@@ -160,7 +160,7 @@ export function Settings() {
                   <div className="warn-box" style={{ marginTop: 10 }}>
                     <AlertTriangle size={16} className="warn-icon" />
                     <div className="warn-text">
-                      <b>RAG_ADMIN_TOKEN is set in the environment</b> and takes precedence over this saved
+                      <b>DOWMIND_ADMIN_TOKEN is set in the environment</b> and takes precedence over this saved
                       token at runtime. Unset it to use the generated one.
                     </div>
                   </div>

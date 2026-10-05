@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/enowdev/enowx-rag/pkg/indexer"
-	"github.com/enowdev/enowx-rag/pkg/rag"
+	"github.com/RivaldiMurpia/dow-mind/pkg/indexer"
+	"github.com/RivaldiMurpia/dow-mind/pkg/rag"
 )
 
 // DefaultK is the default number of final results returned by Search.
@@ -606,7 +606,7 @@ func (s *Service) DeletePoints(ctx context.Context, projectID string, pointIDs [
 }
 
 // IndexDocuments indexes a batch of documents into the project collection
-// directly (without scanning a directory). This is used by the rag_index MCP tool.
+// directly (without scanning a directory). This is used by the mind_index MCP tool.
 func (s *Service) IndexDocuments(ctx context.Context, projectID string, docs []rag.Document) error {
 	if err := s.provider.Index(ctx, projectID, docs); err != nil {
 		return fmt.Errorf("index documents: %w", err)

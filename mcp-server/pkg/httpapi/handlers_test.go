@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/enowdev/enowx-rag/pkg/core"
-	"github.com/enowdev/enowx-rag/pkg/rag"
+	"github.com/RivaldiMurpia/dow-mind/pkg/core"
+	"github.com/RivaldiMurpia/dow-mind/pkg/rag"
 )
 
 // realHome is the developer's HOME captured before any test mutates the env.
@@ -126,7 +126,7 @@ var _ core.ProjectLister = (*mockProvider)(nil)
 func newTestServer(t *testing.T, provider rag.Provider, ui fs.FS) (*core.Service, http.Handler) {
 	t.Helper()
 	// Isolate config/auth from the host so tests are deterministic regardless of
-	// the developer's ~/.enowx-rag/config.yaml or environment. Auth middleware
+	// the developer's ~/.dow-mind/config.yaml or environment. Auth middleware
 	// reads config.EffectiveAdminToken(), which loads that file; point HOME at an
 	// empty temp dir and clear the admin token env var.
 	//
@@ -137,7 +137,7 @@ func newTestServer(t *testing.T, provider rag.Provider, ui fs.FS) (*core.Service
 	if os.Getenv("HOME") == realHome {
 		t.Setenv("HOME", t.TempDir())
 	}
-	t.Setenv("RAG_ADMIN_TOKEN", "")
+	t.Setenv("DOWMIND_ADMIN_TOKEN", "")
 	svc := core.NewService(provider, nil, nil)
 	return svc, NewRouter(svc, ui, nil)
 }
@@ -461,7 +461,7 @@ func TestSearch_BadProject(t *testing.T) {
 // ListPoints returning nil).
 func TestSearch_BadProject_NoLister(t *testing.T) {
 	t.Setenv("HOME", t.TempDir()) // isolate from host config token
-	t.Setenv("RAG_ADMIN_TOKEN", "")
+	t.Setenv("DOWMIND_ADMIN_TOKEN", "")
 	p := &mockProviderNoLister{
 		points: nil, // no points → project doesn't exist
 	}
@@ -930,10 +930,10 @@ func serveSSE(t *testing.T, provider rag.Provider) *httptest.ResponseRecorder {
 }
 
 // TestSSE_NoCORSByDefault verifies that GET /api/events does NOT emit an
-// Access-Control-Allow-Origin header when RAG_CORS_ORIGIN is unset, keeping
+// Access-Control-Allow-Origin header when DOWMIND_CORS_ORIGIN is unset, keeping
 // the event stream same-origin only.
 func TestSSE_NoCORSByDefault(t *testing.T) {
-	t.Setenv("RAG_CORS_ORIGIN", "")
+	t.Setenv("DOWMIND_CORS_ORIGIN", "")
 	w := serveSSE(t, &mockProvider{})
 
 	if got := w.Header().Get("Access-Control-Allow-Origin"); got != "" {
@@ -941,11 +941,11 @@ func TestSSE_NoCORSByDefault(t *testing.T) {
 	}
 }
 
-// TestSSE_CORSWhenConfigured verifies that RAG_CORS_ORIGIN, when set, is
+// TestSSE_CORSWhenConfigured verifies that DOWMIND_CORS_ORIGIN, when set, is
 // reflected verbatim into the Access-Control-Allow-Origin header.
 func TestSSE_CORSWhenConfigured(t *testing.T) {
 	const origin = "https://app.example.com"
-	t.Setenv("RAG_CORS_ORIGIN", origin)
+	t.Setenv("DOWMIND_CORS_ORIGIN", origin)
 
 	w := serveSSE(t, &mockProvider{})
 

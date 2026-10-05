@@ -35,7 +35,7 @@ export function Migration({ activeProject, projects }: MigrationProps) {
   const [qdrantURL, setQdrantURL] = useState('http://localhost:6333')
   const [qdrantKey, setQdrantKey] = useState('')
   const [chromaURL, setChromaURL] = useState('http://localhost:8000')
-  const [pgDSN, setPgDSN] = useState('postgresql://enowdev@localhost:5432/enowxrag')
+  const [pgDSN, setPgDSN] = useState('postgresql://RivaldiMurpia@localhost:5432/dowmindrag')
   const [pgTable, setPgTable] = useState('project_memory')
   const [voyageKey, setVoyageKey] = useState('')
   const [voyageModel, setVoyageModel] = useState('voyage-4')

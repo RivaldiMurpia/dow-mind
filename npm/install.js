@@ -1,5 +1,5 @@
-// postinstall: download the platform-native enowx-rag binary from the matching
-// GitHub Release and place it at bin/enowx-rag(.exe). No runtime npm deps —
+// postinstall: download the platform-native dow-mind binary from the matching
+// GitHub Release and place it at bin/dow-mind(.exe). No runtime npm deps —
 // uses Node's built-in https and the system tar/unzip for extraction.
 'use strict'
 
@@ -10,11 +10,11 @@ const https = require('https')
 const { execFileSync } = require('child_process')
 const { resolveTarget, binaryName, binaryPath, archiveFor } = require('./lib/platform')
 
-const REPO = 'enowdev/enowx-rag'
+const REPO = 'RivaldiMurpia/dow-mind'
 const version = 'v' + require('./package.json').version
 
 function log(msg) {
-  process.stdout.write(`enowx-rag: ${msg}\n`)
+  process.stdout.write(`dow-mind: ${msg}\n`)
 }
 
 // Follow redirects (GitHub release assets 302 to a CDN) and stream to a file.
@@ -22,7 +22,7 @@ function download(url, dest, redirects = 0) {
   return new Promise((resolve, reject) => {
     if (redirects > 10) return reject(new Error('too many redirects'))
     https
-      .get(url, { headers: { 'User-Agent': 'enowx-rag-npm' } }, (res) => {
+      .get(url, { headers: { 'User-Agent': 'dow-mind-npm' } }, (res) => {
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
           res.resume()
           return resolve(download(res.headers.location, dest, redirects + 1))
@@ -59,8 +59,8 @@ function extract(archive, destDir, isZip) {
 
 async function main() {
   // Allow skipping the download (e.g. air-gapped CI that provides its own binary).
-  if (process.env.ENOWX_SKIP_DOWNLOAD === '1') {
-    log('ENOWX_SKIP_DOWNLOAD=1 set; skipping binary download')
+  if (process.env.DOWMIND_SKIP_DOWNLOAD === '1') {
+    log('DOWMIND_SKIP_DOWNLOAD=1 set; skipping binary download')
     return
   }
 
@@ -68,7 +68,7 @@ async function main() {
   const archive = archiveFor(version, goos, arch)
   const url = `https://github.com/${REPO}/releases/download/${version}/${archive}`
 
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'enowx-rag-'))
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'dow-mind-'))
   const archivePath = path.join(tmp, archive)
   const binDir = path.join(__dirname, 'bin')
   fs.mkdirSync(binDir, { recursive: true })

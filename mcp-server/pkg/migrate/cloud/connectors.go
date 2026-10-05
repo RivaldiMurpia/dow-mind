@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/enowdev/enowx-rag/pkg/rag"
+	"github.com/RivaldiMurpia/dow-mind/pkg/rag"
 )
 
 // EXPERIMENTAL connectors below: built from vendor API docs, mock-tested only.

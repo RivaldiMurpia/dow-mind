@@ -84,7 +84,7 @@ export function StepAutoSetup({ cfg, onBack, onNext }: StepAutoSetupProps) {
               <Terminal size={16} className="cli-hint-icon" />
               <div className="d-text">
                 To start the backend, run the commands above yourself, or let the CLI do it:
-                <pre className="code-body mono" style={{ marginTop: 8 }}>enowx-rag setup --run</pre>
+                <pre className="code-body mono" style={{ marginTop: 8 }}>dow-mind setup --run</pre>
                 This writes the compose file and runs <code className="mono">docker compose up -d</code> in your
                 terminal. The dashboard never runs Docker for you.
               </div>

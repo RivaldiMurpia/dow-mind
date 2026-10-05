@@ -24,11 +24,11 @@ func (h *Handlers) SSE(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 	// Only advertise a cross-origin policy when explicitly configured via
-	// RAG_CORS_ORIGIN (e.g. "*" or "https://app.example.com"). When unset,
+	// DOWMIND_CORS_ORIGIN (e.g. "*" or "https://app.example.com"). When unset,
 	// no CORS header is sent so the event stream stays same-origin only —
 	// this prevents other web apps from reading events when the instance is
-	// exposed publicly (especially alongside RAG_ADMIN_TOKEN).
-	if origin := os.Getenv("RAG_CORS_ORIGIN"); origin != "" {
+	// exposed publicly (especially alongside DOWMIND_ADMIN_TOKEN).
+	if origin := os.Getenv("DOWMIND_CORS_ORIGIN"); origin != "" {
 		w.Header().Set("Access-Control-Allow-Origin", origin)
 	}
 

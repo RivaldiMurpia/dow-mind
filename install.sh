@@ -1,16 +1,16 @@
 #!/bin/sh
-# enowx-rag installer — downloads a prebuilt binary from GitHub Releases.
+# dow-mind installer — downloads a prebuilt binary from GitHub Releases.
 #
-#   curl -fsSL https://raw.githubusercontent.com/enowdev/enowx-rag/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/RivaldiMurpia/dow-mind/main/install.sh | sh
 #
 # Options (env vars):
-#   ENOWX_VERSION   version to install, e.g. v0.1.0 (default: latest)
-#   ENOWX_INSTALL_DIR   install directory (default: /usr/local/bin, or
+#   DOWMIND_VERSION   version to install, e.g. v0.1.0 (default: latest)
+#   DOWMIND_INSTALL_DIR   install directory (default: /usr/local/bin, or
 #                       ~/.local/bin if that isn't writable)
 set -eu
 
-REPO="enowdev/enowx-rag"
-BINARY="enowx-rag"
+REPO="RivaldiMurpia/dow-mind"
+BINARY="dow-mind"
 
 info() { printf '\033[1;34m==>\033[0m %s\n' "$1"; }
 err()  { printf '\033[1;31merror:\033[0m %s\n' "$1" >&2; exit 1; }
@@ -52,12 +52,12 @@ case "$arch" in
 esac
 
 # --- Resolve version ---
-version="${ENOWX_VERSION:-}"
+version="${DOWMIND_VERSION:-}"
 if [ -z "$version" ]; then
   info "Resolving latest release…"
   version=$(fetch "https://api.github.com/repos/${REPO}/releases/latest" \
     | grep '"tag_name":' | head -1 | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')
-  [ -n "$version" ] || err "could not determine latest version; set ENOWX_VERSION"
+  [ -n "$version" ] || err "could not determine latest version; set DOWMIND_VERSION"
 fi
 # Strip a leading v for the archive name (which uses the bare version).
 ver_no_v=${version#v}
@@ -93,7 +93,7 @@ tar -xzf "${tmp}/${archive}" -C "$tmp"
 chmod +x "${tmp}/${BINARY}"
 
 # --- Choose install dir ---
-dir="${ENOWX_INSTALL_DIR:-/usr/local/bin}"
+dir="${DOWMIND_INSTALL_DIR:-/usr/local/bin}"
 if [ ! -d "$dir" ] || [ ! -w "$dir" ]; then
   if [ "$dir" = "/usr/local/bin" ]; then
     dir="${HOME}/.local/bin"

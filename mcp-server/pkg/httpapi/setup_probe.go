@@ -9,25 +9,25 @@ import (
 	"strings"
 )
 
-// agentsMarkerStart / agentsMarkerEnd delimit the enowx-rag block inside a
+// agentsMarkerStart / agentsMarkerEnd delimit the dow-mind block inside a
 // project's AGENTS.md so it can be merged idempotently without touching the
 // user's own content.
 const (
-	agentsMarkerStart = "<!-- enowx-rag:start -->"
-	agentsMarkerEnd   = "<!-- enowx-rag:end -->"
+	agentsMarkerStart = "<!-- dow-mind:start -->"
+	agentsMarkerEnd   = "<!-- dow-mind:end -->"
 )
 
 // skillDirs are the known per-client skill directories. Only some clients have
 // a skill system; the skill is "installed" if present in any of them.
-var skillDirs = []string{"~/.claude/skills/enowx-rag", "~/.factory/skills/enowx-rag"}
+var skillDirs = []string{"~/.claude/skills/dow-mind", "~/.factory/skills/dow-mind"}
 
 // SetupProbe handles GET /api/setup/probe?client=<id>&dir=<project-dir>.
 // It reports what is already set up so an agent can skip finished steps:
-//   - mcp: whether the enowx-rag server is in the client's config (per client,
+//   - mcp: whether the dow-mind server is in the client's config (per client,
 //     or all clients when `client` is omitted)
 //   - skill: whether the skill is installed in a known skill directory
 //   - agents_md: whether the project's AGENTS.md exists and already contains the
-//     enowx-rag block
+//     dow-mind block
 func (h *Handlers) SetupProbe(w http.ResponseWriter, r *http.Request) {
 	clientID := r.URL.Query().Get("client")
 	dir := r.URL.Query().Get("dir")
@@ -82,22 +82,22 @@ func (h *Handlers) SetupProbe(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// agentsBlock builds the enowx-rag AGENTS.md block for a project, wrapped in the
+// agentsBlock builds the dow-mind AGENTS.md block for a project, wrapped in the
 // idempotent markers so it can be merged in and out cleanly.
 func agentsBlock(projectID string) string {
 	return fmt.Sprintf(`%s
-## enowx-rag memory (project: %s)
+## dow-mind memory (project: %s)
 
-This project uses the enowx-rag MCP server for per-project RAG memory.
+This project uses the dow-mind MCP server for per-project RAG memory.
 
-- **Before coding**: call `+"`rag_retrieve_context`"+` with project ID `+"`%s`"+` and the user's query; use any relevant context.
-- **After coding**: call `+"`rag_index`"+` with new facts/decisions/gotchas, then `+"`rag_index_project`"+` with the project directory to sync file changes. Keep chunks focused; tag with `+"`type:architecture|decision|api|bugfix|howto|snippet`"+`.
+- **Before coding**: call `+"`mind_retrieve_context`"+` with project ID `+"`%s`"+` and the user's query; use any relevant context.
+- **After coding**: call `+"`mind_index`"+` with new facts/decisions/gotchas, then `+"`mind_index_project`"+` with the project directory to sync file changes. Keep chunks focused; tag with `+"`type:architecture|decision|api|bugfix|howto|snippet`"+`.
 - Each project has its own collection; do not mix project memories.
 %s`, agentsMarkerStart, projectID, projectID, agentsMarkerEnd)
 }
 
 // SetupWriteAgentsMD handles POST /api/setup/write-agents-md.
-// Body: {dir, project_id}. It merges the enowx-rag block into the project's
+// Body: {dir, project_id}. It merges the dow-mind block into the project's
 // AGENTS.md idempotently: if the file has the markers, the block is replaced;
 // if the file exists without markers, the block is appended; if the file does
 // not exist, it is created with the block. The user's own content is preserved.

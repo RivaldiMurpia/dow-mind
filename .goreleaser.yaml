@@ -1,4 +1,4 @@
-# GoReleaser config for enowx-rag.
+# GoReleaser config for dow-mind.
 # Docs: https://goreleaser.com
 #
 # The Go module lives in ./mcp-server (its go.mod is there), and the web
@@ -9,7 +9,7 @@
 # The .github/workflows/release.yml workflow runs `goreleaser release` on tags.
 version: 2
 
-project_name: enowx-rag
+project_name: dow-mind
 
 before:
   hooks:
@@ -17,8 +17,8 @@ before:
     - go -C mcp-server mod download
 
 builds:
-  - id: enowx-rag
-    binary: enowx-rag
+  - id: dow-mind
+    binary: dow-mind
     dir: mcp-server
     main: ./cmd/mcp-server
     env:
@@ -42,7 +42,7 @@ builds:
 archives:
   - id: default
     ids:
-      - enowx-rag
+      - dow-mind
     # v0.1.0_darwin_arm64.tar.gz etc. install.sh depends on this name format.
     name_template: >-
       {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
@@ -69,33 +69,33 @@ changelog:
 
 release:
   github:
-    owner: enowdev
-    name: enowx-rag
+    owner: RivaldiMurpia
+    name: dow-mind
   # Draft the release so you can review binaries before publishing.
   draft: false
   prerelease: auto
   name_template: "{{ .Tag }}"
 
 # --- Homebrew tap -----------------------------------------------------------
-# Requires a repo github.com/enowdev/homebrew-tap and a token in the
+# Requires a repo github.com/RivaldiMurpia/homebrew-tap and a token in the
 # HOMEBREW_TAP_GITHUB_TOKEN secret (a PAT with `repo` scope, or a fine-grained
-# token with contents:write on homebrew-tap). Then: brew install enowdev/tap/enowx-rag
+# token with contents:write on homebrew-tap). Then: brew install RivaldiMurpia/tap/dow-mind
 brews:
-  - name: enowx-rag
+  - name: dow-mind
     ids:
       - default
     repository:
-      owner: enowdev
+      owner: RivaldiMurpia
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-    homepage: "https://github.com/enowdev/enowx-rag"
+    homepage: "https://github.com/RivaldiMurpia/dow-mind"
     description: "Per-project RAG memory MCP server for AI coding agents"
     license: "Apache-2.0"
     commit_author:
       name: goreleaser-bot
-      email: goreleaser@enowx-rag.local
+      email: goreleaser@dow-mind.local
     directory: Formula
     test: |
-      system "#{bin}/enowx-rag", "version"
+      system "#{bin}/dow-mind", "version"
     install: |
-      bin.install "enowx-rag"
+      bin.install "dow-mind"

@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/enowdev/enowx-rag/pkg/config"
-	"github.com/enowdev/enowx-rag/pkg/rag"
+	"github.com/RivaldiMurpia/dow-mind/pkg/config"
+	"github.com/RivaldiMurpia/dow-mind/pkg/rag"
 )
 
 // --- Request / response types for setup wizard endpoints ---
@@ -122,7 +122,7 @@ func (h *Handlers) SetupTest(w http.ResponseWriter, r *http.Request) {
 }
 
 // SetupApply handles POST /api/setup/apply.
-// It saves the submitted config to ~/.enowx-rag/config.yaml with chmod 0600.
+// It saves the submitted config to ~/.dow-mind/config.yaml with chmod 0600.
 func (h *Handlers) SetupApply(w http.ResponseWriter, r *http.Request) {
 	var req setupConfigRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -154,7 +154,7 @@ func (h *Handlers) SetupApply(w http.ResponseWriter, r *http.Request) {
 }
 
 // SetupStatus handles GET /api/setup/status.
-// It returns whether a config file exists at ~/.enowx-rag/config.yaml.
+// It returns whether a config file exists at ~/.dow-mind/config.yaml.
 func (h *Handlers) SetupStatus(w http.ResponseWriter, r *http.Request) {
 	_, err := os.Stat(config.Path())
 	configured := err == nil

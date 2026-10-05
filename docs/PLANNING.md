@@ -1,10 +1,10 @@
-# enowx-rag — Planning: Advanced RAG Platform + UI
+# dow-mind — Planning: Advanced RAG Platform + UI
 
 > Status: rencana implementasi (belum dikerjakan). Dokumen ini adalah spesifikasi untuk agent yang akan mengimplementasikan.
 > Terakhir diperbarui: 2026-07-11.
 > Baca juga: [`HANDOFF.md`](./HANDOFF.md) (cara pakai skill/MCP/RAG untuk project ini) dan [`mockups/dashboard.html`](./mockups/dashboard.html) (referensi visual UI yang sudah di-approve).
 
-Rencana menaikkan `enowx-rag` dari MCP server (stdio, headless) menjadi **platform RAG self-host open-source** dengan UI: dashboard, retrieval playground, dan **onboarding wizard** (pilih embedding + vector DB, local/cloud, set endpoint, auto-setup) — **tanpa membuang** MCP server yang sudah ada.
+Rencana menaikkan `dow-mind` dari MCP server (stdio, headless) menjadi **platform RAG self-host open-source** dengan UI: dashboard, retrieval playground, dan **onboarding wizard** (pilih embedding + vector DB, local/cloud, set endpoint, auto-setup) — **tanpa membuang** MCP server yang sudah ada.
 
 ---
 
@@ -75,7 +75,7 @@ type Provider interface {
 ```
 
 ### 6 MCP tool existing
-`rag_create_project`, `rag_delete_project`, `rag_index`, `rag_semantic_search`, `rag_retrieve_context`, `rag_index_project`.
+`mind_create_project`, `mind_delete_project`, `mind_index`, `mind_semantic_search`, `mind_retrieve_context`, `mind_index_project`.
 
 ### Gap ke visi
 - ❌ Tidak ada HTTP server / API / UI.
@@ -109,8 +109,8 @@ type Provider interface {
 **Prinsip:** MCP dan HTTP dua-duanya adapter tipis di atas core yang sama. `go build` tetap hasilkan **1 binary**.
 
 **Mode jalan:**
-- `enowx-rag` (default) → stdio MCP (seperti sekarang, tak berubah).
-- `enowx-rag --serve [--addr :7777]` → HTTP + UI.
+- `dow-mind` (default) → stdio MCP (seperti sekarang, tak berubah).
+- `dow-mind --serve [--addr :7777]` → HTTP + UI.
 
 ---
 
@@ -132,7 +132,7 @@ mcp-server/
 │   │   └── rerank.go          # BARU: Voyage reranker client
 │   ├── indexer/               # (existing) + content_hash + versioning
 │   │   └── indexer.go
-│   ├── config/                # BARU: load/save ~/.enowx-rag/config.yaml
+│   ├── config/                # BARU: load/save ~/.dow-mind/config.yaml
 │   │   └── config.go
 │   ├── core/                  # BARU: service layer dipakai MCP & HTTP
 │   │   └── service.go
@@ -249,13 +249,13 @@ func (p *PGVectorProvider) queryVector(ctx context.Context, query string) ([]flo
 }
 ```
 
-**Update `main.go`** — teruskan `RAG_VECTOR_DIM` ke konstruktor:
+**Update `main.go`** — teruskan `DOWMIND_VECTOR_DIM` ke konstruktor:
 
 ```go
 // cmd/mcp-server/main.go, di buildProvider()
 case "voyage":
 	if cfg.VoyageAPIKey == "" {
-		return nil, fmt.Errorf("RAG_VOYAGE_API_KEY is required for voyage embedder")
+		return nil, fmt.Errorf("DOWMIND_VOYAGE_API_KEY is required for voyage embedder")
 	}
 	embedder = rag.NewVoyageEmbeddingClient(cfg.VoyageAPIKey, cfg.VoyageModel, cfg.VectorDim)
 ```
@@ -465,9 +465,9 @@ type Config struct {
 	// ...
 }
 
-func Path() string { // ~/.enowx-rag/config.yaml
+func Path() string { // ~/.dow-mind/config.yaml
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".enowx-rag", "config.yaml")
+	return filepath.Join(home, ".dow-mind", "config.yaml")
 }
 func Load() (*Config, error) { /* baca yaml; error jika belum ada → trigger wizard */ }
 func Save(c *Config) error   { /* mkdir + tulis yaml, chmod 0600 (ada API key) */ }
@@ -709,7 +709,7 @@ web:
 	cd web && npm ci && npm run build   # hasil ke web/dist
 
 build: web
-	cd mcp-server && go build -o enowx-rag ./cmd/mcp-server
+	cd mcp-server && go build -o dow-mind ./cmd/mcp-server
 
 dev-web:
 	cd web && npm run dev               # vite dev server proxy ke :7777
@@ -718,7 +718,7 @@ dev-web:
 ### 9.2 Lain-lain
 - `docker-compose.yml` all-in-one (sudah ada, tambah service UI opsional).
 - README + GIF wizard, one-command deploy.
-- Auth ringan opsional (single admin token via `RAG_ADMIN_TOKEN`) bila di-expose ke internet.
+- Auth ringan opsional (single admin token via `DOWMIND_ADMIN_TOKEN`) bila di-expose ke internet.
 
 ---
 
@@ -766,15 +766,15 @@ Font: UI = Inter/Geist; data/mono = JetBrains Mono / Geist Mono. **Bukan** Rubik
 - ⚠️ **Env var menang atas config.yaml** — jaga agar MCP stdio existing tak berubah perilaku saat file config muncul.
 - ⚠️ **HNSW pgvector**: butuh index (jangan seq scan). Untuk irit storage pertimbangkan `halfvec(1024)`. Voyage output normalized → cosine.
 - ⚠️ **Build pipeline**: `web/dist` harus ada sebelum `go build` (embed.FS gagal kalau folder kosong). Makefile `build` depend `web`.
-- ⚠️ **Selera desain ≠ RobloxKit**: RobloxKit glass+gradient+rose; enowx-rag true-black flat zero gradient. Reuse ekosistem React saja, bukan look-nya.
+- ⚠️ **Selera desain ≠ RobloxKit**: RobloxKit glass+gradient+rose; dow-mind true-black flat zero gradient. Reuse ekosistem React saja, bukan look-nya.
 - ⚠️ **Indexer chunkSize 1500** dipilih agar chunk + prefix "File:" muat di limit token TEI (~512 tok, ~3 char/token). Kalau pindah ke Voyage penuh, bisa dinaikkan.
 
 ---
 
 ## 12. Status pengerjaan
 
-- [x] Project ter-index ke RAG (`project_enowx-rag`, 17 file, 76 chunk).
-- [x] Skill terpasang (`~/.factory/skills/enowx-rag/skill.md`).
+- [x] Project ter-index ke RAG (`project_dow-mind`, 17 file, 76 chunk).
+- [x] Skill terpasang (`~/.factory/skills/dow-mind/skill.md`).
 - [x] AGENTS.md & CLAUDE.md sudah ada di root.
 - [x] Kriteria UI dikunci (true-black flat) + mockup dashboard di-approve (`docs/mockups/dashboard.html`).
 - [x] Planning detail dengan contoh kode (dokumen ini).

@@ -86,7 +86,7 @@ export function Docs() {
 
   const docsURL = `${window.location.origin}/api/docs/setup`
   const agentPrompt =
-    `Set up enowx-rag (per-project RAG memory) for this project. ` +
+    `Set up dow-mind (per-project RAG memory) for this project. ` +
     `First read the setup instructions at ${docsURL} and follow them exactly: ` +
     `probe what's already installed, then install only the missing pieces ` +
     `(MCP server for my client, the skill, and the AGENTS.md block). ` +

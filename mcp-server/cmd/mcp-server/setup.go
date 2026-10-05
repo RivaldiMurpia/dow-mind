@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// runSetup implements the `enowx-rag setup` subcommand. It generates a
+// runSetup implements the `dow-mind setup` subcommand. It generates a
 // docker-compose file for the configured backend and prints the commands to
 // start it. With --run it executes `docker compose up -d` for the required
 // services directly in the user's terminal.
@@ -18,7 +18,7 @@ import (
 func runSetup(args []string) {
 	fs := flag.NewFlagSet("setup", flag.ExitOnError)
 	run := fs.Bool("run", false, "run `docker compose up -d` for the configured backend")
-	file := fs.String("file", "docker-compose.enowx.yml", "path to write the generated compose file")
+	file := fs.String("file", "docker-compose.dowmind.yml", "path to write the generated compose file")
 	_ = fs.Parse(args)
 
 	cfg, err := resolveConfig()
@@ -36,8 +36,8 @@ func runSetup(args []string) {
 		fmt.Println(compose)
 		fmt.Printf("\n# To start the backend, run:\n")
 		fmt.Printf("docker compose -f %s up -d %s\n", *file, strings.Join(services, " "))
-		fmt.Printf("\n# Or let enowx-rag do it for you:\n")
-		fmt.Printf("enowx-rag setup --run\n")
+		fmt.Printf("\n# Or let dow-mind do it for you:\n")
+		fmt.Printf("dow-mind setup --run\n")
 		return
 	}
 
@@ -58,7 +58,7 @@ func runSetup(args []string) {
 		fmt.Fprintf(os.Stderr, "docker compose failed: %v\n", err)
 		os.Exit(1)
 	}
-	fmt.Fprintf(os.Stderr, "backend started. Start the server with: enowx-rag --serve\n")
+	fmt.Fprintf(os.Stderr, "backend started. Start the server with: dow-mind --serve\n")
 }
 
 // composeServices returns the docker-compose service names required by the
@@ -91,8 +91,8 @@ func generateCompose(cfg *RuntimeConfig) string {
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_DB: enowxrag
-      POSTGRES_USER: enowdev
+      POSTGRES_DB: dowmindrag
+      POSTGRES_USER: RivaldiMurpia
     volumes:
       - pgdata:/var/lib/postgresql/data`)
 		volumes = append(volumes, "  pgdata:")

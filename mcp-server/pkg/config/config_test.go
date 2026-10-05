@@ -25,17 +25,17 @@ func helperSetEnv(t *testing.T, envs map[string]string) func() {
 	}
 }
 
-// helperClearEnv unsets all RAG_ env vars and returns a cleanup function.
+// helperClearEnv unsets all DOWMIND_ env vars and returns a cleanup function.
 func helperClearEnv(t *testing.T) func() {
 	t.Helper()
 	keys := []string{
-		"RAG_VECTOR_STORE", "RAG_EMBEDDER",
-		"RAG_QDRANT_URL", "RAG_QDRANT_API_KEY",
-		"RAG_CHROMA_URL",
-		"RAG_PGVECTOR_DSN",
-		"RAG_TEI_URL",
-		"RAG_VOYAGE_API_KEY", "RAG_VOYAGE_MODEL", "RAG_VECTOR_DIM",
-		"RAG_RERANKER_MODEL",
+		"DOWMIND_VECTOR_STORE", "DOWMIND_EMBEDDER",
+		"DOWMIND_QDRANT_URL", "DOWMIND_QDRANT_API_KEY",
+		"DOWMIND_CHROMA_URL",
+		"DOWMIND_PGVECTOR_DSN",
+		"DOWMIND_TEI_URL",
+		"DOWMIND_VOYAGE_API_KEY", "DOWMIND_VOYAGE_MODEL", "DOWMIND_VECTOR_DIM",
+		"DOWMIND_RERANKER_MODEL",
 	}
 	saved := make(map[string]string)
 	for _, k := range keys {
@@ -59,7 +59,7 @@ func TestPath(t *testing.T) {
 		t.Fatalf("os.UserHomeDir: %v", err)
 	}
 	got := Path()
-	want := filepath.Join(home, ".enowx-rag", "config.yaml")
+	want := filepath.Join(home, ".dow-mind", "config.yaml")
 	if got != want {
 		t.Errorf("Path() = %q, want %q", got, want)
 	}
@@ -91,7 +91,7 @@ func TestLoad_ValidYAML(t *testing.T) {
 	t.Setenv("HOME", tmpDir)
 
 	// Write a valid config.yaml.
-	configDir := filepath.Join(tmpDir, ".enowx-rag")
+	configDir := filepath.Join(tmpDir, ".dow-mind")
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +101,7 @@ voyage:
   api_key: test-key-123
   model: voyage-4
   dim: 1024
-pgvector_dsn: "postgresql://enowdev@localhost:5432/enowxrag"
+pgvector_dsn: "postgresql://RivaldiMurpia@localhost:5432/dowmindrag"
 qdrant_url: "http://localhost:6333"
 qdrant_api_key: ""
 chroma_url: "http://localhost:8000"
@@ -133,8 +133,8 @@ reranker_model: "rerank-2.5"
 	if cfg.Voyage.Dim != 1024 {
 		t.Errorf("Voyage.Dim = %d, want %d", cfg.Voyage.Dim, 1024)
 	}
-	if cfg.PGVectorDSN != "postgresql://enowdev@localhost:5432/enowxrag" {
-		t.Errorf("PGVectorDSN = %q, want %q", cfg.PGVectorDSN, "postgresql://enowdev@localhost:5432/enowxrag")
+	if cfg.PGVectorDSN != "postgresql://RivaldiMurpia@localhost:5432/dowmindrag" {
+		t.Errorf("PGVectorDSN = %q, want %q", cfg.PGVectorDSN, "postgresql://RivaldiMurpia@localhost:5432/dowmindrag")
 	}
 	if cfg.QdrantURL != "http://localhost:6333" {
 		t.Errorf("QdrantURL = %q, want %q", cfg.QdrantURL, "http://localhost:6333")
@@ -153,7 +153,7 @@ func TestLoad_InvalidYAML(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("HOME", tmpDir)
 
-	configDir := filepath.Join(tmpDir, ".enowx-rag")
+	configDir := filepath.Join(tmpDir, ".dow-mind")
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		t.Fatal(err)
 	}
@@ -190,7 +190,7 @@ func TestSave_CreatesDirectoryAndFile(t *testing.T) {
 			Model:  "voyage-4",
 			Dim:    1024,
 		},
-		PGVectorDSN: "postgresql://enowdev@localhost:5432/enowxrag",
+		PGVectorDSN: "postgresql://RivaldiMurpia@localhost:5432/dowmindrag",
 		QdrantURL:   "http://localhost:6333",
 	}
 
@@ -268,7 +268,7 @@ func TestRoundTrip_SaveThenLoad(t *testing.T) {
 		VectorStore:   "pgvector",
 		Embedder:      "voyage",
 		Voyage:        VoyageConfig{APIKey: "rt-key", Model: "voyage-4", Dim: 1024},
-		PGVectorDSN:   "postgresql://enowdev@localhost:5432/enowxrag",
+		PGVectorDSN:   "postgresql://RivaldiMurpia@localhost:5432/dowmindrag",
 		QdrantURL:     "http://localhost:6333",
 		QdrantAPIKey:  "qdrant-secret",
 		ChromaURL:     "http://localhost:8000",
@@ -297,7 +297,7 @@ func TestEnvVarOverridePriority(t *testing.T) {
 	t.Setenv("HOME", tmpDir)
 
 	// Write a config file with specific values.
-	configDir := filepath.Join(tmpDir, ".enowx-rag")
+	configDir := filepath.Join(tmpDir, ".dow-mind")
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		t.Fatal(err)
 	}
@@ -307,7 +307,7 @@ voyage:
   api_key: file-key
   model: voyage-4
   dim: 1024
-pgvector_dsn: "postgresql://enowdev@localhost:5432/enowxrag"
+pgvector_dsn: "postgresql://RivaldiMurpia@localhost:5432/dowmindrag"
 qdrant_url: "http://localhost:6333"
 `
 	configPath := filepath.Join(configDir, "config.yaml")
@@ -317,8 +317,8 @@ qdrant_url: "http://localhost:6333"
 
 	t.Run("env_var_wins_over_file", func(t *testing.T) {
 		cleanup := helperSetEnv(t, map[string]string{
-			"RAG_VECTOR_STORE":   "qdrant",
-			"RAG_VOYAGE_API_KEY": "env-key",
+			"DOWMIND_VECTOR_STORE":   "qdrant",
+			"DOWMIND_VOYAGE_API_KEY": "env-key",
 		})
 		defer cleanup()
 
@@ -393,7 +393,7 @@ func TestResolve_FullPriority(t *testing.T) {
 	t.Setenv("HOME", tmpDir)
 
 	// Write config file.
-	configDir := filepath.Join(tmpDir, ".enowx-rag")
+	configDir := filepath.Join(tmpDir, ".dow-mind")
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		t.Fatal(err)
 	}
@@ -413,9 +413,9 @@ qdrant_url: "http://file-qdrant:6333"
 
 	t.Run("env_overrides_file", func(t *testing.T) {
 		cleanup := helperSetEnv(t, map[string]string{
-			"RAG_VECTOR_STORE":   "chroma",
-			"RAG_PGVECTOR_DSN":   "postgresql://env-dsn",
-			"RAG_VOYAGE_API_KEY": "env-key",
+			"DOWMIND_VECTOR_STORE":   "chroma",
+			"DOWMIND_PGVECTOR_DSN":   "postgresql://env-dsn",
+			"DOWMIND_VOYAGE_API_KEY": "env-key",
 		})
 		defer cleanup()
 
@@ -464,7 +464,7 @@ qdrant_url: "http://file-qdrant:6333"
 		defer cleanup()
 
 		// Remove config file.
-		os.Remove(filepath.Join(tmpDir, ".enowx-rag", "config.yaml"))
+		os.Remove(filepath.Join(tmpDir, ".dow-mind", "config.yaml"))
 
 		cfg, err := Resolve()
 		if err != nil {
@@ -492,9 +492,9 @@ func TestResolve_VectorDimEnvOverride(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("HOME", tmpDir)
 
-	// Set RAG_VECTOR_DIM env var.
+	// Set DOWMIND_VECTOR_DIM env var.
 	dimCleanup := helperSetEnv(t, map[string]string{
-		"RAG_VECTOR_DIM": "512",
+		"DOWMIND_VECTOR_DIM": "512",
 	})
 	defer dimCleanup()
 
@@ -532,7 +532,7 @@ func TestSave_OverwritesExisting(t *testing.T) {
 		VectorStore: "pgvector",
 		Embedder:    "voyage",
 		Voyage:      VoyageConfig{APIKey: "second-key", Model: "voyage-4", Dim: 1024},
-		PGVectorDSN: "postgresql://enowdev@localhost:5432/enowxrag",
+		PGVectorDSN: "postgresql://RivaldiMurpia@localhost:5432/dowmindrag",
 	}
 	if err := Save(cfg2); err != nil {
 		t.Fatalf("Save() second: %v", err)

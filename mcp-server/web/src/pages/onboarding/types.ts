@@ -23,7 +23,7 @@ export interface DraftConfig {
 
 export const defaultDraft: DraftConfig = {
   vectorStore: '',
-  pgvectorDSN: 'postgresql://enowdev@localhost:5432/enowxrag',
+  pgvectorDSN: 'postgresql://RivaldiMurpia@localhost:5432/dowmindrag',
   qdrantURL: 'http://localhost:6333',
   qdrantAPIKey: '',
   chromaURL: 'http://localhost:8000',
@@ -98,8 +98,8 @@ const SERVICE_BLOCKS: Record<string, string> = {
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_DB: enowxrag
-      POSTGRES_USER: enowdev
+      POSTGRES_DB: dowmindrag
+      POSTGRES_USER: RivaldiMurpia
     volumes:
       - pgdata:/var/lib/postgresql/data`,
   qdrant: `  qdrant:
@@ -147,13 +147,13 @@ export function generateCommands(cfg: DraftConfig): string {
   if (names.includes('postgres')) {
     lines.push('')
     lines.push('# Verify pgvector extension')
-    lines.push('psql -h localhost -U enowdev -d enowxrag \\')
+    lines.push('psql -h localhost -U RivaldiMurpia -d dowmindrag \\')
     lines.push('  -c "CREATE EXTENSION IF NOT EXISTS vector;"')
   }
 
   lines.push('')
-  lines.push('# Start enowx-rag server')
-  lines.push('./enowx-rag --serve --addr :7777')
+  lines.push('# Start dow-mind server')
+  lines.push('./dow-mind --serve --addr :7777')
 
   return lines.join('\n')
 }
