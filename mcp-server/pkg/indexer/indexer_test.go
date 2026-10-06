@@ -150,7 +150,7 @@ func TestIndexerAddsContentHash(t *testing.T) {
 	}
 }
 
-// TestIndexerAddsChunkVersion verifies that IndexProject adds chunk_version="v3"
+// TestIndexerAddsChunkVersion verifies that IndexProject adds chunk_version="v4"
 // to each document's metadata.
 func TestIndexerAddsChunkVersion(t *testing.T) {
 	dir := t.TempDir()
@@ -173,8 +173,8 @@ func TestIndexerAddsChunkVersion(t *testing.T) {
 			t.Errorf("doc %d: chunk_version not in metadata", i)
 			continue
 		}
-		if version != "v3" {
-			t.Errorf("doc %d: chunk_version = %q, want %q", i, version, "v3")
+		if version != "v4" {
+			t.Errorf("doc %d: chunk_version = %q, want %q", i, version, "v4")
 		}
 	}
 }
@@ -390,5 +390,36 @@ func TestIndexerListPointsErrorProceedsWithoutSkip(t *testing.T) {
 	}
 	if result.Indexed == 0 {
 		t.Error("expected chunks to be indexed even when ListPoints fails")
+	}
+}
+
+// TestFindStalePoints_OrphanChunks verifies that points whose chunk_index is
+// beyond the current run's chunk count for a file (e.g. after a chunking
+// version change shrinks it) are reported stale, even though the file itself
+// still exists.
+func TestFindStalePoints_OrphanChunks(t *testing.T) {
+	provider := &mockProvider{
+		existingPoints: []rag.PointInfo{
+			{ID: "p0", SourceFile: "a.go", ChunkIndex: "0"},
+			{ID: "p1", SourceFile: "a.go", ChunkIndex: "1"},
+			{ID: "p2", SourceFile: "a.go", ChunkIndex: "2"}, // orphan: a.go now has 2 chunks
+			{ID: "p3", SourceFile: "gone.go", ChunkIndex: "0"}, // file deleted
+			{ID: "p4", SourceFile: "b.go", ChunkIndex: "0"},
+		},
+	}
+	idx := NewIndexer(provider, 1000)
+	stale, err := idx.findStalePoints(context.Background(), "proj", "dir",
+		[]string{"a.go", "b.go"}, map[string]int{"a.go": 2, "b.go": 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]bool{"p2": true, "p3": true}
+	if len(stale) != len(want) {
+		t.Fatalf("stale = %v, want %v", stale, want)
+	}
+	for _, id := range stale {
+		if !want[id] {
+			t.Errorf("unexpected stale id %q", id)
+		}
 	}
 }

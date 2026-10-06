@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **P1 (this fork):** file watcher with auto re-index, code-aware chunk splitting, pluggable rerankers (beyond Voyage).
 
 ### Added
+- **AST-aware chunking (tree-sitter, chunk v4)**: code files with a bundled grammar (Go, TypeScript, TSX, JavaScript, Python) are now split along real syntactic declarations — each function/method/class becomes its own chunk — instead of heuristic line-boundary cuts. Implemented with the official tree-sitter C runtime compiled to a single `wasm32-wasi` module (`pkg/indexer/ts-core.wasm`, built via `zig cc`; see `docs/ast-wasm.md`) and driven from pure Go through wazero: **no cgo**, the binary stays fully static. Guest traps (pathological input) are contained as Go errors and the chunker degrades to the heuristic splitter; languages without a grammar or trees with top-level syntax errors also fall back automatically. Chunk version bumped `v3` → `v4`, so existing indexes re-embed once on the next index run.
 - **One-line install + prebuilt binaries**: releases now ship cross-compiled,
   CGO-free binaries for macOS/Linux (amd64/arm64) and Windows (amd64) via
   GoReleaser (`.github/workflows/release.yml` on tag `v*`). Install without a

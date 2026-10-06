@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	gitignore "github.com/sabhiram/go-gitignore"
@@ -89,6 +90,11 @@ func (idx *Indexer) IndexProject(ctx context.Context, projectID, rootDir string)
 	var docs []rag.Document
 	var currentFiles []string
 	skipped := 0
+	// fileChunkCounts tracks how many chunks each file produced in THIS run.
+	// A chunking change (e.g. heuristic -> AST) can shrink a file's chunk
+	// count; without this, the orphaned high-index points from the previous
+	// run would never be recognized as stale.
+	fileChunkCounts := make(map[string]int)
 
 	// Compile the project's .gitignore (if any) so indexed files respect it.
 	// defaultIgnores still apply on top as a baseline.
@@ -143,7 +149,17 @@ func (idx *Indexer) IndexProject(ctx context.Context, projectID, rootDir string)
 			return nil
 		}
 
-		chunks := applyOverlap(chunkCode(string(content), idx.chunkSize), defaultOverlapChars)
+		// AST-aware chunking first (tree-sitter, pure Go via wazero): each
+		// top-level declaration becomes its own chunk. Falls back to the
+		// heuristic splitter for languages without a bundled grammar or on
+		// any parse failure — AST chunking is an upgrade path, never a
+		// hard requirement.
+		chunks := chunkAST(relPath, content, idx.chunkSize)
+		if chunks == nil {
+			chunks = chunkCode(string(content), idx.chunkSize)
+		}
+		chunks = applyOverlap(chunks, defaultOverlapChars)
+		fileChunkCounts[relPath] = len(chunks)
 		for i, chunk := range chunks {
 			docID := fmt.Sprintf("%s/%s#chunk%d", sourceDir, relPath, i)
 			contentHash := computeContentHash(chunk)
@@ -160,7 +176,7 @@ func (idx *Indexer) IndexProject(ctx context.Context, projectID, rootDir string)
 					"source_dir":    sourceDir,
 					"chunk_index":   fmt.Sprintf("%d", i),
 					"content_hash":  contentHash,
-					"chunk_version": "v3",
+					"chunk_version": "v4",
 				},
 			})
 		}
@@ -186,7 +202,7 @@ func (idx *Indexer) IndexProject(ctx context.Context, projectID, rootDir string)
 	}
 
 	// Find and delete stale points (files that no longer exist in THIS directory).
-	staleIDs, err := idx.findStalePoints(ctx, projectID, sourceDir, currentFiles)
+	staleIDs, err := idx.findStalePoints(ctx, projectID, sourceDir, currentFiles, fileChunkCounts)
 	if err != nil {
 		return &SyncResult{Indexed: len(docs), Deleted: 0, Skipped: skipped, StaleError: err.Error()}, nil
 	}
@@ -213,7 +229,7 @@ type SyncResult struct {
 	StaleError   string `json:"stale_error,omitempty"`
 }
 
-func (idx *Indexer) findStalePoints(ctx context.Context, projectID, sourceDir string, currentFiles []string) ([]string, error) {
+func (idx *Indexer) findStalePoints(ctx context.Context, projectID, sourceDir string, currentFiles []string, fileChunkCounts map[string]int) ([]string, error) {
 	currentSet := make(map[string]bool, len(currentFiles))
 	for _, f := range currentFiles {
 		currentSet[f] = true
@@ -233,6 +249,15 @@ func (idx *Indexer) findStalePoints(ctx context.Context, projectID, sourceDir st
 		}
 		if !currentSet[pt.SourceFile] {
 			stale = append(stale, pt.ID)
+			continue
+		}
+		// Orphaned chunk slot: the file still exists but now produces fewer
+		// chunks than the point's index (e.g. after a chunking-version
+		// change). Without this, old-version chunks linger forever.
+		if n, ok := fileChunkCounts[pt.SourceFile]; ok {
+			if ci, err := strconv.Atoi(pt.ChunkIndex); err == nil && ci >= n {
+				stale = append(stale, pt.ID)
+			}
 		}
 	}
 	return stale, nil
@@ -271,8 +296,8 @@ func splitCodeBlocks(text string) []string {
 // chunkCode splits text into chunks of approximately maxChars, preferring cut
 // points at blank-line boundaries (which usually separate functions, classes,
 // or paragraphs in code). Blocks larger than maxChars fall back to line-based
-// splitting. This is a heuristic approximation of semantic chunking — true
-// AST-aware splitting is future work.
+// splitting. This is the heuristic fallback used when AST chunking (chunkAST)
+// is unavailable for a file's language or its parse fails.
 func chunkCode(text string, maxChars int) []string {
 	if len(text) <= maxChars {
 		return []string{text}
