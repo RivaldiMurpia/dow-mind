@@ -14,8 +14,10 @@ package indexer
 // hard requirement.
 
 import (
+	"log"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
 // astLang describes one bundled tree-sitter grammar: the wasm export that
@@ -57,6 +59,23 @@ var astLanguages = map[string]*astLang{
 	}},
 }
 
+// astFallbackOnce ensures we log only the first fallback reason per process:
+// when every file falls back the same way, one line names the cause.
+var astFallbackOnce sync.Once
+
+func noteASTFallback(reason string) {
+	astFallbackOnce.Do(func() {
+		log.Printf("dow-mind: ast: chunkAST fallback (%s), using heuristic chunking", reason)
+	})
+}
+
+func errString(err error) string {
+	if err == nil {
+		return "empty tree"
+	}
+	return err.Error()
+}
+
 // chunkAST splits src into AST-aligned chunks of at most maxChars.
 // It returns nil when the file's language has no bundled grammar, the engine
 // fails to initialize, parsing fails, or the tree has top-level syntax
@@ -67,20 +86,23 @@ func chunkAST(filename string, src []byte, maxChars int) []string {
 	}
 	lang := astLanguages[strings.ToLower(filepath.Ext(filename))]
 	if lang == nil {
-		return nil
+		return nil // no bundled grammar: heuristic chunking is the normal path
 	}
 	eng, err := getASTEngine()
 	if err != nil {
+		noteASTFallback("engine: " + err.Error())
 		return nil
 	}
 	nodes, err := eng.parseNodes(lang.grammarExport, src)
 	if err != nil || len(nodes) == 0 {
+		noteASTFallback("parse " + lang.grammarExport + ": " + errString(err))
 		return nil
 	}
 	// A syntax error at the top level means the declaration structure is
 	// unreliable — don't build chunks on a broken tree.
 	for _, n := range nodes {
 		if n.depth <= 1 && n.isError {
+			noteASTFallback("top-level syntax error")
 			return nil
 		}
 	}
