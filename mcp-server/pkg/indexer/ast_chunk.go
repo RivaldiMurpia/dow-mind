@@ -59,29 +59,6 @@ var astLanguages = map[string]*astLang{
 	}},
 }
 
-// astDebugOnce logs parse internals for the first grammar file only —
-// temporary diagnostic to see what the tree-sitter engine returns on hosts
-// where chunkAST silently disagrees with local results.
-var astDebugOnce sync.Once
-
-func logASTDebug(filename string, nodes []astNode) {
-	astDebugOnce.Do(func() {
-		d1, d1named := 0, 0
-		kinds := map[string]int{}
-		for _, n := range nodes {
-			if n.depth == 1 {
-				d1++
-				if n.named {
-					d1named++
-					kinds[n.kind]++
-				}
-			}
-		}
-		log.Printf("dow-mind: ast: debug file=%s nodes=%d depth1=%d depth1named=%d kinds=%v",
-			filename, len(nodes), d1, d1named, kinds)
-	})
-}
-
 // astFallbackOnce ensures we log only the first fallback reason per process:
 // when every file falls back the same way, one line names the cause.
 var astFallbackOnce sync.Once
@@ -121,7 +98,6 @@ func chunkAST(filename string, src []byte, maxChars int) []string {
 		noteASTFallback("parse " + lang.grammarExport + ": " + errString(err))
 		return nil
 	}
-	logASTDebug(filename, nodes)
 	// A syntax error at the top level means the declaration structure is
 	// unreliable — don't build chunks on a broken tree.
 	for _, n := range nodes {
