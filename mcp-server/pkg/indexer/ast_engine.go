@@ -23,6 +23,7 @@ import (
 	_ "embed"
 	"encoding/binary"
 	"fmt"
+	"log"
 	"sync"
 
 	"github.com/tetratelabs/wazero"
@@ -85,19 +86,41 @@ var (
 func getASTEngine() (*tsEngine, error) {
 	astEngineOnce.Do(func() {
 		astEngine, astEngineErr = newTSEngine(context.Background())
+		if astEngineErr != nil {
+			// Visible in journalctl: without this, a broken engine fails
+			// silently into heuristic chunking and looks like "nothing changed".
+			log.Printf("dow-mind: ast: tree-sitter engine unavailable, using heuristic chunking: %v", astEngineErr)
+		}
 	})
 	return astEngine, astEngineErr
 }
 
 func newTSEngine(ctx context.Context) (*tsEngine, error) {
-	cfg := wazero.NewRuntimeConfigCompiler().WithMemoryLimitPages(astMemLimitPages)
+	// Try the optimizing compiler backend first; fall back to the
+	// interpreter when the host can't run wazero-compiled code (some
+	// VPS kernels restrict executable memory mappings). Parsing stays
+	// ms-scale either way next to embedding API calls.
+	eng, backend, err := instantiateEngine(ctx, wazero.NewRuntimeConfigCompiler(), "compiler")
+	if err != nil {
+		log.Printf("dow-mind: ast: compiler backend failed (%v), trying interpreter", err)
+		eng, backend, err = instantiateEngine(ctx, wazero.NewRuntimeConfigInterpreter(), "interpreter")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("ast: no usable wasm backend: %w", err)
+	}
+	log.Printf("dow-mind: ast: tree-sitter engine ready (%s backend)", backend)
+	return eng, nil
+}
+
+func instantiateEngine(ctx context.Context, cfg wazero.RuntimeConfig, backend string) (*tsEngine, string, error) {
+	cfg = cfg.WithMemoryLimitPages(astMemLimitPages)
 	rt := wazero.NewRuntimeWithConfig(ctx, cfg)
 	wasi_snapshot_preview1.MustInstantiate(ctx, rt)
 	mod, err := rt.InstantiateWithConfig(ctx, tsCoreWasm,
 		wazero.NewModuleConfig().WithName("ts").WithStartFunctions("_initialize"))
 	if err != nil {
 		rt.Close(ctx)
-		return nil, fmt.Errorf("ast: instantiate wasm: %w", err)
+		return nil, "", fmt.Errorf("ast: instantiate wasm: %w", err)
 	}
 	e := &tsEngine{
 		ctx: ctx, rt: rt, mod: mod, mem: mod.Memory(),
@@ -117,9 +140,9 @@ func newTSEngine(ctx context.Context) (*tsEngine, error) {
 	}
 	if rs := e.call(mod.ExportedFunction("ts_dump_rec_size")); rs != astRecSize {
 		rt.Close(ctx)
-		return nil, fmt.Errorf("ast: NodeRec size mismatch: guest=%d host=%d", rs, astRecSize)
+		return nil, "", fmt.Errorf("ast: NodeRec size mismatch: guest=%d host=%d", rs, astRecSize)
 	}
-	return e, nil
+	return e, backend, nil
 }
 
 func (e *tsEngine) close() { e.rt.Close(e.ctx) }
