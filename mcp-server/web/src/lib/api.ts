@@ -232,6 +232,29 @@ async function fetchJSON<T>(url: string, init?: RequestInit): Promise<T> {
   return resp.json() as Promise<T>
 }
 
+// fetchText mirrors fetchJSON (same auth header + error handling) but
+// returns the body as text — for endpoints like /api/docs/{section} that
+// serve markdown instead of JSON.
+async function fetchText(url: string, init?: RequestInit): Promise<string> {
+  const token = getAdminToken()
+  const headers: Record<string, string> = { ...(init?.headers as Record<string, string> | undefined) }
+  if (token && !headers['Authorization']) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+  const resp = await fetch(url, { ...init, headers })
+  if (!resp.ok) {
+    let msg = `HTTP ${resp.status}`
+    try {
+      const body = await resp.json()
+      if (body.error) msg = body.error
+    } catch {
+      // not JSON
+    }
+    throw new Error(msg)
+  }
+  return resp.text()
+}
+
 export const api = {
   listProjects: () => fetchJSON<ProjectStat[]>(`${API_BASE}/projects`),
 
@@ -335,9 +358,6 @@ export const api = {
 
   docsList: () => fetchJSON<{ id: string; title: string }[]>(`${API_BASE}/docs`),
 
-  docsSection: async (id: string): Promise<string> => {
-    const r = await fetch(`${API_BASE}/docs/${encodeURIComponent(id)}`)
-    if (!r.ok) throw new Error(`HTTP ${r.status}`)
-    return r.text()
-  },
+  docsSection: (id: string): Promise<string> =>
+    fetchText(`${API_BASE}/docs/${encodeURIComponent(id)}`),
 }
