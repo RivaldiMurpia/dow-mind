@@ -154,10 +154,13 @@ func (h *Handlers) SetupApply(w http.ResponseWriter, r *http.Request) {
 }
 
 // SetupStatus handles GET /api/setup/status.
-// It returns whether a config file exists at ~/.dow-mind/config.yaml.
+// It returns whether the server is configured: either a config file exists
+// at ~/.dow-mind/config.yaml, or the essential backend credentials were
+// provided via environment (the production/docker/systemd path — see
+// config.EnvConfigured). Env-based deploys must not be sent to the wizard.
 func (h *Handlers) SetupStatus(w http.ResponseWriter, r *http.Request) {
 	_, err := os.Stat(config.Path())
-	configured := err == nil
+	configured := err == nil || config.EnvConfigured()
 	writeJSON(w, http.StatusOK, setupStatusResponse{Configured: configured})
 }
 

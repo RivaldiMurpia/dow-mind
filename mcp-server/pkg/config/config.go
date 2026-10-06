@@ -70,6 +70,25 @@ func EffectiveAdminToken() string {
 	return cfg.AdminToken
 }
 
+// EnvConfigured reports whether the essential backend configuration has been
+// provided via environment variables (the production/docker/systemd path).
+// An embedder API key is the essential credential: with one present, the
+// server is fully operational without a config file, so the first-run setup
+// wizard is unnecessary. The vector store needs no key in the common cases
+// (Qdrant/Chroma default to localhost; pgvector via DSN is optional).
+func EnvConfigured() bool {
+	for _, k := range []string{
+		"DOWMIND_VOYAGE_API_KEY",
+		"DOWMIND_OPENAI_API_KEY",
+		"DOWMIND_COHERE_API_KEY",
+	} {
+		if os.Getenv(k) != "" {
+			return true
+		}
+	}
+	return false
+}
+
 // Default returns a Config populated with built-in default values. These are
 // the lowest-priority values, used when neither an env var nor a config file
 // provides a setting.

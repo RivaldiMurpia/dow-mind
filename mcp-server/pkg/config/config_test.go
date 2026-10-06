@@ -35,7 +35,10 @@ func helperClearEnv(t *testing.T) func() {
 		"DOWMIND_PGVECTOR_DSN",
 		"DOWMIND_TEI_URL",
 		"DOWMIND_VOYAGE_API_KEY", "DOWMIND_VOYAGE_MODEL", "DOWMIND_VECTOR_DIM",
-		"DOWMIND_RERANKER_MODEL",
+		"DOWMIND_OPENAI_API_KEY", "DOWMIND_OPENAI_MODEL", "DOWMIND_OPENAI_BASE_URL", "DOWMIND_OPENAI_DIM",
+		"DOWMIND_COHERE_API_KEY", "DOWMIND_COHERE_MODEL",
+		"DOWMIND_RERANKER", "DOWMIND_RERANKER_MODEL",
+		"DOWMIND_ADMIN_TOKEN",
 	}
 	saved := make(map[string]string)
 	for _, k := range keys {
@@ -549,4 +552,33 @@ func TestSave_OverwritesExisting(t *testing.T) {
 	if loaded.Voyage.APIKey != "second-key" {
 		t.Errorf("Voyage.APIKey = %q, want %q", loaded.Voyage.APIKey, "second-key")
 	}
+}
+
+func TestEnvConfigured(t *testing.T) {
+	cleanup := helperClearEnv(t)
+	defer cleanup()
+
+	if EnvConfigured() {
+		t.Error("EnvConfigured() = true with no env vars set, want false")
+	}
+
+	for _, key := range []string{"DOWMIND_VOYAGE_API_KEY", "DOWMIND_OPENAI_API_KEY", "DOWMIND_COHERE_API_KEY"} {
+		t.Run(key, func(t *testing.T) {
+			cleanup := helperClearEnv(t)
+			defer cleanup()
+			os.Setenv(key, "test-key")
+			if !EnvConfigured() {
+				t.Errorf("EnvConfigured() = false with %s set, want true", key)
+			}
+		})
+	}
+
+	t.Run("unrelated env var", func(t *testing.T) {
+		cleanup := helperClearEnv(t)
+		defer cleanup()
+		os.Setenv("DOWMIND_ADMIN_TOKEN", "tok")
+		if EnvConfigured() {
+			t.Error("EnvConfigured() = true with only DOWMIND_ADMIN_TOKEN set, want false")
+		}
+	})
 }
