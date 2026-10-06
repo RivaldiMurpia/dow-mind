@@ -36,29 +36,28 @@ function App() {
   // First-run detection: check if config exists on load.
   // If no config, show wizard. If config exists, probe the API: when the
   // server has an admin token set, /api/* returns 401 and we show the
-  // unlock screen instead of an empty dashboard.
-  useEffect(() => {
-    let cancelled = false
-    api.setupStatus()
-      .then((status) => {
-        if (cancelled) return
+  // unlock screen instead of an empty dashboard. Note /api/setup/status
+  // itself sits behind the token middleware, so a 401 there also means
+  // "locked" — it must not fall through to the dashboard.
+  const boot = useCallback(() => {
+    api.setupStatus().then(
+      (status) => {
         if (!status.configured) {
           setAppState('wizard')
           return
         }
         return api.listProjects().then(
-          () => { if (!cancelled) setAppState('dashboard') },
-          (e) => { if (!cancelled) setAppState(isUnauthorizedError(e) ? 'locked' : 'dashboard') },
+          () => setAppState('dashboard'),
+          (e) => setAppState(isUnauthorizedError(e) ? 'locked' : 'dashboard'),
         )
-      })
-      .catch(() => {
-        if (cancelled) return
-        // If we can't reach the API, default to dashboard
-        // (the server might not have setup endpoints, or it's a dev issue)
-        setAppState('dashboard')
-      })
-    return () => { cancelled = true }
+      },
+      (e) => setAppState(isUnauthorizedError(e) ? 'locked' : 'dashboard'),
+    )
   }, [])
+
+  useEffect(() => {
+    boot()
+  }, [boot])
 
   const handleUnlock = useCallback(() => {
     const t = tokenInput.trim()
@@ -66,13 +65,13 @@ function App() {
     setTokenError('')
     setAdminToken(t)
     api.listProjects().then(
-      () => setAppState('dashboard'),
+      () => boot(),
       (e) => {
         setAdminToken('')
         setTokenError(isUnauthorizedError(e) ? 'Wrong token — try again.' : 'Could not reach the server.')
       },
     )
-  }, [tokenInput])
+  }, [tokenInput, boot])
 
   const handleWizardComplete = useCallback(() => {
     setAppState('dashboard')
