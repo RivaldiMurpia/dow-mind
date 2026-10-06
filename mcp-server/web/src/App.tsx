@@ -10,7 +10,7 @@ import { Chunks } from './pages/Chunks'
 import { Setup } from './pages/Setup'
 import { Wizard } from './pages/onboarding/Wizard'
 import { useTheme } from './lib/useTheme'
-import { api } from './lib/api'
+import { api, setAdminToken, isUnauthorizedError } from './lib/api'
 
 export type Page = 'overview' | 'playground' | 'chunks' | 'migration' | 'docs' | 'settings' | 'setup'
 
@@ -19,7 +19,7 @@ export interface ProjectInfo {
   chunkCount: number
 }
 
-type AppState = 'checking' | 'wizard' | 'dashboard'
+type AppState = 'checking' | 'locked' | 'wizard' | 'dashboard'
 
 function App() {
   const { theme, toggleTheme } = useTheme()
@@ -27,18 +27,29 @@ function App() {
   const [page, setPage] = useState<Page>('overview')
   const [projects, setProjects] = useState<ProjectInfo[]>([])
   const [activeProject, setActiveProject] = useState<string>('')
+  const [tokenInput, setTokenInput] = useState('')
+  const [tokenError, setTokenError] = useState('')
   // Shared query state: VAL-CROSS-010 requires that the query entered in the
   // Overview playground persists when navigating to the full Playground page.
   const [sharedQuery, setSharedQuery] = useState('')
 
   // First-run detection: check if config exists on load.
-  // If no config, show wizard. If config exists, show dashboard.
+  // If no config, show wizard. If config exists, probe the API: when the
+  // server has an admin token set, /api/* returns 401 and we show the
+  // unlock screen instead of an empty dashboard.
   useEffect(() => {
     let cancelled = false
     api.setupStatus()
       .then((status) => {
         if (cancelled) return
-        setAppState(status.configured ? 'dashboard' : 'wizard')
+        if (!status.configured) {
+          setAppState('wizard')
+          return
+        }
+        return api.listProjects().then(
+          () => { if (!cancelled) setAppState('dashboard') },
+          (e) => { if (!cancelled) setAppState(isUnauthorizedError(e) ? 'locked' : 'dashboard') },
+        )
       })
       .catch(() => {
         if (cancelled) return
@@ -48,6 +59,20 @@ function App() {
       })
     return () => { cancelled = true }
   }, [])
+
+  const handleUnlock = useCallback(() => {
+    const t = tokenInput.trim()
+    if (!t) return
+    setTokenError('')
+    setAdminToken(t)
+    api.listProjects().then(
+      () => setAppState('dashboard'),
+      (e) => {
+        setAdminToken('')
+        setTokenError(isUnauthorizedError(e) ? 'Wrong token — try again.' : 'Could not reach the server.')
+      },
+    )
+  }, [tokenInput])
 
   const handleWizardComplete = useCallback(() => {
     setAppState('dashboard')
@@ -88,6 +113,30 @@ function App() {
       <div className="app-loading">
         <div className="brand-mark mono">e</div>
         <span>Loading…</span>
+      </div>
+    )
+  }
+
+  // Admin token gate: the server requires a Bearer token on /api/*.
+  if (appState === 'locked') {
+    return (
+      <div className="app-loading">
+        <div className="brand-mark mono">e</div>
+        <span>DOW Mind is locked</span>
+        <span style={{ opacity: 0.6, fontSize: 13 }}>Enter the admin token to unlock the dashboard.</span>
+        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+          <input
+            className="input mono"
+            type="password"
+            value={tokenInput}
+            onChange={(e) => setTokenInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleUnlock() }}
+            placeholder="Admin token"
+            autoFocus
+          />
+          <button className="btn primary" onClick={handleUnlock}>Unlock</button>
+        </div>
+        {tokenError && <span style={{ color: '#f66', fontSize: 13 }}>{tokenError}</span>}
       </div>
     )
   }

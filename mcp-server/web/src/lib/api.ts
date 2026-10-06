@@ -174,8 +174,51 @@ export interface MigrateResponse {
 
 const API_BASE = '/api'
 
+const TOKEN_KEY = 'dowmind_admin_token'
+
+// Admin token handling: the server requires a Bearer token on /api/*
+// whenever DOWMIND_ADMIN_TOKEN is set. The dashboard keeps the token in
+// sessionStorage (cleared when the tab closes) and attaches it to every
+// API call. A ?token= URL param is accepted once and immediately stripped
+// from the address bar.
+export function getAdminToken(): string {
+  try {
+    const params = new URLSearchParams(window.location.search)
+    const fromUrl = params.get('token')
+    if (fromUrl) {
+      sessionStorage.setItem(TOKEN_KEY, fromUrl)
+      params.delete('token')
+      const qs = params.toString()
+      window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : ''))
+      return fromUrl
+    }
+    return sessionStorage.getItem(TOKEN_KEY) || ''
+  } catch {
+    return ''
+  }
+}
+
+export function setAdminToken(token: string) {
+  try {
+    if (token) sessionStorage.setItem(TOKEN_KEY, token)
+    else sessionStorage.removeItem(TOKEN_KEY)
+  } catch {
+    // storage unavailable — token simply won't persist
+  }
+}
+
+export function isUnauthorizedError(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e)
+  return msg === 'unauthorized' || msg.startsWith('HTTP 401')
+}
+
 async function fetchJSON<T>(url: string, init?: RequestInit): Promise<T> {
-  const resp = await fetch(url, init)
+  const token = getAdminToken()
+  const headers: Record<string, string> = { ...(init?.headers as Record<string, string> | undefined) }
+  if (token && !headers['Authorization']) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+  const resp = await fetch(url, { ...init, headers })
   if (!resp.ok) {
     let msg = `HTTP ${resp.status}`
     try {
