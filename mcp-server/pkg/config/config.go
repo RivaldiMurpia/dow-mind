@@ -130,6 +130,17 @@ func MetricsDBPath() string {
 	return filepath.Join(home, ".dow-mind", "metrics.db")
 }
 
+// WatchesPath returns the absolute path to the persisted watch registry:
+// ~/.dow-mind/watches.json. The registry maps project IDs to watched
+// directories so watches survive server restarts.
+func WatchesPath() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return filepath.Join(".dow-mind", "watches.json")
+	}
+	return filepath.Join(home, ".dow-mind", "watches.json")
+}
+
 // Load reads the config file from Path() and returns a populated *Config.
 // If the file does not exist, Load returns an error (this triggers the
 // onboarding wizard in HTTP mode). Env var overrides are applied on top of

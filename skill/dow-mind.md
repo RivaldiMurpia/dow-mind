@@ -467,7 +467,7 @@ This project uses `dow-mind` MCP server for per-project memory (RAG).
 
 1. Summarize what you changed and why.
 2. Call `mind_index` with useful new facts, design decisions, gotchas, or patterns under project ID `PROJECT_ID`.
-3. Sync file changes: prefer `mind_watch_project` once per project (auto re-indexes on every change, debounced), or call `mind_index_project` to sync manually. Both handle new files, edits, and deletions automatically.
+3. Sync file changes: prefer `mind_watch_project` once per project (auto re-indexes on every change, debounced; watches persist across server restarts), or call `mind_index_project` to sync manually. Both handle new files, edits, and deletions automatically.
 4. Keep chunks focused and concise (one idea per chunk). Include metadata tags when helpful.
 
 ## Project ID
@@ -517,7 +517,7 @@ You are working with a project that has an `dow-mind` MCP server installed.
 
 1. Summarize what you changed and why.
 2. Call `mind_index` with useful new facts, design decisions, gotchas, or patterns under project ID `PROJECT_ID`.
-3. Sync file changes: prefer `mind_watch_project` once per project (auto re-indexes on every change, debounced), or call `mind_index_project` to sync manually. Both handle new files, edits, and deletions automatically.
+3. Sync file changes: prefer `mind_watch_project` once per project (auto re-indexes on every change, debounced; watches persist across server restarts), or call `mind_index_project` to sync manually. Both handle new files, edits, and deletions automatically.
 4. Keep chunks focused and concise (one idea per chunk). Include metadata tags when helpful.
 
 ## Project ID

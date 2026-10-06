@@ -292,6 +292,15 @@ func main() {
 	}
 
 	if *serve {
+		// Restore persisted watches (from ~/.dow-mind/watches.json) before
+		// serving: each gets a cheap incremental catch-up re-index, then
+		// resumes live watching. Failures are logged, never fatal.
+		if restored, errs := svc.RestoreWatches(context.Background()); restored > 0 || len(errs) > 0 {
+			fmt.Fprintf(os.Stderr, "dow-mind: restored %d persisted watch(es)\n", restored)
+			for _, err := range errs {
+				fmt.Fprintf(os.Stderr, "dow-mind: watch restore: %v\n", err)
+			}
+		}
 		runHTTP(svc, *addr, cfg)
 		return
 	}

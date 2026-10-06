@@ -109,9 +109,13 @@ type Service struct {
 	metricsStore MetricsStore // optional durable metrics; nil = in-memory only
 	backend      string       // vector store name (e.g. "qdrant"), set by main.go
 	// watches holds active directory watches (projectID -> handle).
-	// Watches are in-memory only and do not survive restarts.
+	// The registry is persisted to ~/.dow-mind/watches.json and restored
+	// on server start (see RestoreWatches).
 	watchMu sync.Mutex
 	watches map[string]*watchHandle
+	// watchesPath overrides the persisted-watch location; empty means the
+	// default (config.WatchesPath()). Tests set this to a temp dir.
+	watchesPath string
 }
 
 // MetricsStore is an optional durable sink for query metrics, injected into
