@@ -599,7 +599,8 @@ func sanitize(s string) string {
 func (p *QdrantProvider) SetPayloadByDocID(ctx context.Context, projectID, docID string, payload map[string]any) error {
 	body := map[string]any{
 		"payload": payload,
-		"filter":  mustFilter(map[string]string{"doc_id": docID}),
+		// mustFilter returns the "must" CLAUSE LIST; the filter object wraps it.
+		"filter": map[string]any{"must": mustFilter(map[string]string{"doc_id": docID})},
 	}
 	var resp struct {
 		Result any `json:"result"`

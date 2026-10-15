@@ -394,9 +394,17 @@ func TestQdrantSetPayloadByDocID(t *testing.T) {
 	if !strings.Contains(fmt.Sprintf("%v", body["payload"]), "lesson-v2") {
 		t.Errorf("payload = %v, want superseded_by lesson-v2", body["payload"])
 	}
-	filterDump := fmt.Sprintf("%v", body["filter"])
-	if !strings.Contains(filterDump, "doc_id") || !strings.Contains(filterDump, "lesson-v1") {
-		t.Errorf("filter = %v, want doc_id match lesson-v1", body["filter"])
+	// The filter must be an OBJECT wrapping a "must" clause list (a bare list
+	// makes Qdrant reject the request with a 400 format error).
+	fltr, ok := body["filter"].(map[string]any)
+	if !ok {
+		t.Fatalf("filter is %T, want object", body["filter"])
+	}
+	if _, ok := fltr["must"].([]any); !ok {
+		t.Errorf("filter missing must list: %v", fltr)
+	}
+	if dump := fmt.Sprintf("%v", fltr); !strings.Contains(dump, "doc_id") || !strings.Contains(dump, "lesson-v1") {
+		t.Errorf("filter = %v, want doc_id match lesson-v1", fltr)
 	}
 	if !strings.Contains(path, "/collections/") {
 		t.Errorf("unexpected path %q", path)
