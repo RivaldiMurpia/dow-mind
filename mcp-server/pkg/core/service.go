@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 
@@ -30,6 +31,15 @@ type SearchOpts struct {
 	Hybrid   bool // use dense+lexical RRF (provider must support it)
 	Rerank   bool // use reranker if configured
 	Compress bool // drop near-duplicate results (same content_hash / identical content)
+	// MinScore is a relevance floor: results scoring below it are dropped
+	// after rerank/ranking but BEFORE the top-K cutoff, so K still means
+	// "up to K good results". 0 (default) disables the floor.
+	MinScore float64
+	// MaxChars is the character budget for RetrieveContext's concatenated
+	// context: chunks are appended best-first until the budget is exhausted.
+	// 0 = default (DefaultMaxContextChars), negative = no cap. Ignored by
+	// Search.
+	MaxChars int
 }
 
 // ProjectStat holds per-project statistics returned by ListProjects.
@@ -752,8 +762,17 @@ func (s *Service) IndexDocuments(ctx context.Context, projectID string, docs []r
 	return nil
 }
 
+// DefaultMaxContextChars is the default character budget for
+// RetrieveContext's concatenated context string (~2k tokens at 4 chars/token).
+const DefaultMaxContextChars = 8000
+
 // RetrieveContext performs a semantic search and returns a concatenated
-// context string suitable for feeding into an LLM, along with the raw results.
+// context string suitable for feeding into an LLM, along with the kept raw
+// results. opts.MaxChars caps the context AFTER ranking: chunks are appended
+// best-first until the budget is exhausted, and when any chunk is cut the
+// string ends with a "[truncated: N chunks omitted]" marker (the omitted
+// chunks are also absent from the returned results). MaxChars semantics:
+// 0 = default budget (DefaultMaxContextChars), negative = no cap.
 func (s *Service) RetrieveContext(ctx context.Context, projectID, query string, opts SearchOpts) (string, []rag.Result, error) {
 	if opts.K <= 0 {
 		opts.K = DefaultK
@@ -762,9 +781,46 @@ func (s *Service) RetrieveContext(ctx context.Context, projectID, query string, 
 	if err != nil {
 		return "", nil, err
 	}
-	parts := make([]string, 0, len(results))
-	for _, r := range results {
-		parts = append(parts, fmt.Sprintf("[score %.3f] %s", r.Score, r.Content))
+
+	budget := opts.MaxChars
+	if budget == 0 {
+		budget = DefaultMaxContextChars
 	}
-	return strings.Join(parts, "\n\n"), results, nil
+
+	var b strings.Builder
+	kept := make([]rag.Result, 0, len(results))
+	used := 0
+	omitted := 0
+	for i, r := range results {
+		part := fmt.Sprintf("[score %.3f] %s", r.Score, r.Content)
+		sepLen := 0
+		if used > 0 {
+			sepLen = 2 // "\n\n" between chunks
+		}
+		if budget > 0 && used+sepLen+len(part) > budget {
+			if i == 0 {
+				// Even the best chunk alone exceeds the budget: include it
+				// truncated rather than returning an empty context.
+				cut := part[:budget]
+				for len(cut) > 0 && !utf8.ValidString(cut) {
+					cut = cut[:len(cut)-1]
+				}
+				b.WriteString(cut)
+				used = budget
+				kept = append(kept, r)
+			}
+			omitted = len(results) - len(kept)
+			break
+		}
+		if used > 0 {
+			b.WriteString("\n\n")
+		}
+		b.WriteString(part)
+		used += sepLen + len(part)
+		kept = append(kept, r)
+	}
+	if omitted > 0 {
+		fmt.Fprintf(&b, "\n\n[truncated: %d chunks omitted]", omitted)
+	}
+	return b.String(), kept, nil
 }

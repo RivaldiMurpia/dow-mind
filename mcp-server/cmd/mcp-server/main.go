@@ -181,6 +181,7 @@ type RetrieveContextInput struct {
 	Hybrid    *bool  `json:"hybrid" jsonschema:"Combine dense + lexical search when the backend supports it (default true)"`
 	Rerank    *bool  `json:"rerank" jsonschema:"Rerank candidates with the reranker when configured (default true)"`
 	Compress  bool   `json:"compress" jsonschema:"Drop near-duplicate results (default false)"`
+	MaxChars  *int   `json:"max_chars" jsonschema:"Character budget for the concatenated context, applied best-first after ranking (default 8000, ~2k tokens); 0 = no cap. When the budget cuts chunks off, the context ends with a '[truncated: N chunks omitted]' marker"`
 }
 
 // searchOptsFromMCP builds SearchOpts from MCP tool inputs. Hybrid and Rerank
@@ -418,9 +419,16 @@ func registerMCPTools(server *mcp.Server, svc *core.Service) {
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "mind_retrieve_context",
-		Description: "Retrieve a compact context string for a project. Fetches top chunks and concatenates them for LLM context.",
+		Description: "Retrieve a compact context string for a project. Fetches top chunks and concatenates them for LLM context, capped by max_chars (default 8000, ~2k tokens) applied best-first after ranking; when the budget cuts chunks off the context ends with '[truncated: N chunks omitted]'. Pass max_chars: 0 for no cap.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in RetrieveContextInput) (*mcp.CallToolResult, any, error) {
 		opts := searchOptsFromMCP(in.Limit, in.Recall, in.Hybrid, in.Rerank, in.Compress)
+		// Core convention: 0 = default budget, negative = no cap. MCP nil =
+		// default (leave 0); explicit 0 means "no cap" per the tool schema.
+		if in.MaxChars != nil && *in.MaxChars == 0 {
+			opts.MaxChars = -1
+		} else if in.MaxChars != nil {
+			opts.MaxChars = *in.MaxChars
+		}
 		context, chunks, err := svc.RetrieveContext(ctx, in.ProjectID, in.Query, opts)
 		if err != nil {
 			return nil, nil, err

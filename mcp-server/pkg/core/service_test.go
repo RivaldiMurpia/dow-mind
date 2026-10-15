@@ -822,6 +822,112 @@ func TestRetrieveContextDefaultLimit(t *testing.T) {
 	}
 }
 
+// TestRetrieveContextBudgetTruncates verifies the default max_chars budget
+// fills best-first and cuts remaining chunks with a truncation marker.
+func TestRetrieveContextBudgetTruncates(t *testing.T) {
+	p := &mockProvider{results: []rag.Result{
+		{ID: "1", Content: strings.Repeat("a", 3000), Score: 0.9},
+		{ID: "2", Content: strings.Repeat("b", 3000), Score: 0.8},
+		{ID: "3", Content: strings.Repeat("c", 3000), Score: 0.7},
+		{ID: "4", Content: strings.Repeat("d", 3000), Score: 0.6},
+	}}
+	svc := NewService(p, nil, nil)
+
+	// No MaxChars set → default 8000 budget applies.
+	ctxStr, kept, err := svc.RetrieveContext(context.Background(), "proj", "q", SearchOpts{K: 4, Recall: 10})
+	if err != nil {
+		t.Fatalf("RetrieveContext error: %v", err)
+	}
+	// Two 3000-char chunks fit (3013 + 3015 = 6028 <= 8000); the third would
+	// exceed it (9043 > 8000).
+	if len(kept) != 2 {
+		t.Errorf("expected 2 kept chunks, got %d", len(kept))
+	}
+	if !strings.HasSuffix(ctxStr, "[truncated: 2 chunks omitted]") {
+		t.Errorf("expected truncation marker, got suffix %q", ctxStr[max(0, len(ctxStr)-60):])
+	}
+	// Context (without marker) must be within budget.
+	base := strings.TrimSuffix(ctxStr, "\n\n[truncated: 2 chunks omitted]")
+	if len(base) > DefaultMaxContextChars {
+		t.Errorf("context base length %d exceeds budget %d", len(base), DefaultMaxContextChars)
+	}
+	// Kept chunks are the two best-scoring ones, in rank order.
+	if kept[0].ID != "1" || kept[1].ID != "2" {
+		t.Errorf("expected chunks [1 2], got [%s %s]", kept[0].ID, kept[1].ID)
+	}
+}
+
+// TestRetrieveContextNoCap verifies MaxChars<0 (MCP max_chars: 0) disables
+// the budget entirely: every chunk is returned and no marker is present.
+func TestRetrieveContextNoCap(t *testing.T) {
+	p := &mockProvider{results: []rag.Result{
+		{ID: "1", Content: strings.Repeat("a", 3000), Score: 0.9},
+		{ID: "2", Content: strings.Repeat("b", 3000), Score: 0.8},
+		{ID: "3", Content: strings.Repeat("c", 3000), Score: 0.7},
+	}}
+	svc := NewService(p, nil, nil)
+
+	ctxStr, kept, err := svc.RetrieveContext(context.Background(), "proj", "q", SearchOpts{K: 3, Recall: 10, MaxChars: -1})
+	if err != nil {
+		t.Fatalf("RetrieveContext error: %v", err)
+	}
+	if len(kept) != 3 {
+		t.Errorf("expected all 3 chunks with no cap, got %d", len(kept))
+	}
+	if strings.Contains(ctxStr, "truncated") {
+		t.Error("no-cap context must not contain a truncation marker")
+	}
+}
+
+// TestRetrieveContextOversizedFirstChunk verifies that when even the best
+// chunk exceeds the budget, it is included truncated (never an empty context)
+// and the marker reports the remaining omitted chunks.
+func TestRetrieveContextOversizedFirstChunk(t *testing.T) {
+	p := &mockProvider{results: []rag.Result{
+		{ID: "1", Content: strings.Repeat("a", 9000), Score: 0.9},
+		{ID: "2", Content: "small", Score: 0.8},
+		{ID: "3", Content: "small", Score: 0.7},
+		{ID: "4", Content: "small", Score: 0.6},
+	}}
+	svc := NewService(p, nil, nil)
+
+	ctxStr, kept, err := svc.RetrieveContext(context.Background(), "proj", "q", SearchOpts{K: 4, Recall: 10})
+	if err != nil {
+		t.Fatalf("RetrieveContext error: %v", err)
+	}
+	if len(kept) != 1 {
+		t.Errorf("expected only the first (truncated) chunk kept, got %d", len(kept))
+	}
+	// "[score 0.900] " prefix (14) + 8986 content chars = 8000.
+	if len(strings.TrimSuffix(ctxStr, "\n\n[truncated: 3 chunks omitted]")) > DefaultMaxContextChars {
+		t.Errorf("truncated context exceeds budget")
+	}
+	if !strings.HasSuffix(ctxStr, "[truncated: 3 chunks omitted]") {
+		t.Errorf("expected '[truncated: 3 chunks omitted]' marker, got %q", ctxStr[max(0, len(ctxStr)-60):])
+	}
+}
+
+// TestRetrieveContextBudgetExplicitOverride verifies MaxChars>0 overrides the
+// default budget.
+func TestRetrieveContextBudgetExplicitOverride(t *testing.T) {
+	p := &mockProvider{results: []rag.Result{
+		{ID: "1", Content: "aaaa", Score: 0.9}, // part = 19 chars
+		{ID: "2", Content: "bbbb", Score: 0.8}, // +21 → 40 > 30
+	}}
+	svc := NewService(p, nil, nil)
+
+	ctxStr, kept, err := svc.RetrieveContext(context.Background(), "proj", "q", SearchOpts{K: 2, Recall: 10, MaxChars: 30})
+	if err != nil {
+		t.Fatalf("RetrieveContext error: %v", err)
+	}
+	if len(kept) != 1 {
+		t.Errorf("expected 1 chunk within the 30-char budget, got %d", len(kept))
+	}
+	if !strings.HasSuffix(ctxStr, "[truncated: 1 chunks omitted]") {
+		t.Errorf("expected truncation marker, got %q", ctxStr)
+	}
+}
+
 // --- EventBus tests ---
 
 func TestEventBusSubscribeUnsubscribe(t *testing.T) {
