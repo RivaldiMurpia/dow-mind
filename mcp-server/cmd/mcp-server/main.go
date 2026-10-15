@@ -213,6 +213,8 @@ type ProjectIDInput struct {
 type ListPointsInput struct {
 	ProjectID  string `json:"project_id" jsonschema:"Project identifier"`
 	SourceFile string `json:"source_file" jsonschema:"Optional: only list chunks from this source file"`
+	Limit      int    `json:"limit" jsonschema:"Max points per page (default 50, hard max 500 — larger values are clamped)"`
+	Offset     int    `json:"offset" jsonschema:"Number of points to skip for pagination (default 0)"`
 }
 
 type DeletePointsInput struct {
@@ -472,20 +474,20 @@ func registerMCPTools(server *mcp.Server, svc *core.Service) {
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "mind_list_points",
-		Description: "List indexed chunks in a project (id, source file, content preview), optionally filtered by source file. Use to inspect what is stored.",
+		Description: "List indexed chunks in a project (id, source file, content preview), optionally filtered by source file. Paginated: limit (default 50, hard max 500) + offset; the response carries the total so you can page with offset. Content previews are capped at 300 chars — use mind_semantic_search or mind_retrieve_context for full content.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in ListPointsInput) (*mcp.CallToolResult, any, error) {
 		filter := map[string]string{}
 		if in.SourceFile != "" {
 			filter["source_file"] = in.SourceFile
 		}
-		points, err := svc.ListPoints(ctx, in.ProjectID, filter)
+		points, total, err := svc.ListPointsPaged(ctx, in.ProjectID, filter, in.Limit, in.Offset)
 		if err != nil {
 			return nil, nil, err
 		}
 		if points == nil {
 			points = []rag.PointInfo{}
 		}
-		return nil, map[string]any{"points": points, "count": len(points)}, nil
+		return nil, map[string]any{"points": points, "count": len(points), "total": total, "offset": in.Offset}, nil
 	})
 
 	mcp.AddTool(server, &mcp.Tool{

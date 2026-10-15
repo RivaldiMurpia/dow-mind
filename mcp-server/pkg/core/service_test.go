@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -1080,3 +1081,142 @@ func (m *mockProviderNonHybrid) ListPoints(ctx context.Context, projectID string
 func (m *mockProviderNonHybrid) Close() error { return nil }
 
 var _ rag.Provider = (*mockProviderNonHybrid)(nil)
+
+// --- ListPointsPaged tests ---
+
+// mockPointPager embeds mockProvider and implements rag.PointPager so the
+// server-side paging path of ListPointsPaged can be tested.
+type mockPointPager struct {
+	mockProvider
+	lastLimit  int
+	lastOffset int
+}
+
+func (m *mockPointPager) ListPointsPage(ctx context.Context, projectID string, metaFilter map[string]string, limit, offset int) ([]rag.PointInfo, int, error) {
+	m.lastLimit = limit
+	m.lastOffset = offset
+	// Build a deterministic fake collection: point-00 .. point-09.
+	all := make([]rag.PointInfo, 10)
+	for i := range all {
+		all[i] = rag.PointInfo{
+			ID:      fmt.Sprintf("point-%02d", i),
+			Content: strings.Repeat("x", 400) + fmt.Sprintf("-%d", i), // > preview cap
+		}
+	}
+	total := len(all)
+	if offset >= total {
+		return []rag.PointInfo{}, total, nil
+	}
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+	return all[offset:end], total, nil
+}
+
+var _ rag.PointPager = (*mockPointPager)(nil)
+
+// TestListPointsPagedDefaultLimit verifies limit<=0 falls back to 50 and the
+// provider receives the clamped values.
+func TestListPointsPagedDefaultLimit(t *testing.T) {
+	p := &mockPointPager{}
+	svc := NewService(p, nil, nil)
+
+	points, total, err := svc.ListPointsPaged(context.Background(), "proj", nil, 0, 0)
+	if err != nil {
+		t.Fatalf("ListPointsPaged error: %v", err)
+	}
+	if p.lastLimit != DefaultListPointsLimit {
+		t.Errorf("expected provider limit=%d, got %d", DefaultListPointsLimit, p.lastLimit)
+	}
+	// 10-point fake collection, page from offset 0 with limit 50 → all 10.
+	if len(points) != 10 || total != 10 {
+		t.Errorf("expected 10 points / total 10, got %d / %d", len(points), total)
+	}
+}
+
+// TestListPointsPagedClampsOversizedLimit verifies limit above the hard max is
+// clamped (not rejected) and offset paging returns the right window.
+func TestListPointsPagedClampsOversizedLimit(t *testing.T) {
+	p := &mockPointPager{}
+	svc := NewService(p, nil, nil)
+
+	_, _, err := svc.ListPointsPaged(context.Background(), "proj", nil, 100000, 0)
+	if err != nil {
+		t.Fatalf("oversized limit should be clamped, not rejected: %v", err)
+	}
+	if p.lastLimit != MaxListPointsLimit {
+		t.Errorf("expected clamped limit=%d, got %d", MaxListPointsLimit, p.lastLimit)
+	}
+
+	// Offset paging: skip 8 → last 2 points.
+	points, total, err := svc.ListPointsPaged(context.Background(), "proj", nil, 5, 8)
+	if err != nil {
+		t.Fatalf("ListPointsPaged error: %v", err)
+	}
+	if total != 10 {
+		t.Errorf("expected total 10, got %d", total)
+	}
+	if len(points) != 2 || points[0].ID != "point-08" || points[1].ID != "point-09" {
+		t.Errorf("expected [point-08 point-09], got %v", points)
+	}
+}
+
+// TestListPointsPagedClampsPreview verifies content previews are truncated to
+// PointPreviewMaxChars in list output.
+func TestListPointsPagedClampsPreview(t *testing.T) {
+	p := &mockPointPager{}
+	svc := NewService(p, nil, nil)
+
+	points, _, err := svc.ListPointsPaged(context.Background(), "proj", nil, 0, 0)
+	if err != nil {
+		t.Fatalf("ListPointsPaged error: %v", err)
+	}
+	for _, pt := range points {
+		if len(pt.Content) > PointPreviewMaxChars {
+			t.Errorf("point %s content preview = %d chars, want <= %d", pt.ID, len(pt.Content), PointPreviewMaxChars)
+		}
+	}
+}
+
+// TestListPointsPagedFallbackSlicesInMemory verifies providers WITHOUT
+// rag.PointPager still get correct paging via a full ListPoints + slice, with
+// the same clamping semantics.
+func TestListPointsPagedFallbackSlicesInMemory(t *testing.T) {
+	p := &mockProvider{points: []rag.PointInfo{
+		{ID: "a", Content: strings.Repeat("y", 400)},
+		{ID: "b", Content: "short"},
+		{ID: "c", Content: "third"},
+	}}
+	svc := NewService(p, nil, nil)
+
+	// Default limit (50) covers all 3; total must equal full size.
+	points, total, err := svc.ListPointsPaged(context.Background(), "proj", nil, 0, 0)
+	if err != nil {
+		t.Fatalf("ListPointsPaged error: %v", err)
+	}
+	if len(points) != 3 || total != 3 {
+		t.Fatalf("expected 3 points / total 3, got %d / %d", len(points), total)
+	}
+	if len(points[0].Content) != PointPreviewMaxChars {
+		t.Errorf("expected preview clamped to %d chars, got %d", PointPreviewMaxChars, len(points[0].Content))
+	}
+
+	// Offset past the end: empty page, correct total.
+	points, total, err = svc.ListPointsPaged(context.Background(), "proj", nil, 2, 5)
+	if err != nil {
+		t.Fatalf("ListPointsPaged error: %v", err)
+	}
+	if len(points) != 0 || total != 3 {
+		t.Errorf("expected empty page / total 3, got %d / %d", len(points), total)
+	}
+
+	// Middle page: offset 1, limit 1 → just "b".
+	points, total, err = svc.ListPointsPaged(context.Background(), "proj", nil, 1, 1)
+	if err != nil {
+		t.Fatalf("ListPointsPaged error: %v", err)
+	}
+	if total != 3 || len(points) != 1 || points[0].ID != "b" {
+		t.Errorf("expected single point 'b' / total 3, got %v / %d", points, total)
+	}
+}

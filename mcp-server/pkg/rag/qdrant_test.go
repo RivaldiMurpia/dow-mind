@@ -1,6 +1,7 @@
 package rag
 
 import (
+	"strings"
 	"context"
 	"encoding/json"
 	"math"
@@ -222,5 +223,94 @@ func TestQdrantExportPoints(t *testing.T) {
 	}
 	if docs[0].Meta["content_hash"] != "h1" {
 		t.Error("metadata not preserved")
+	}
+}
+
+// TestQdrantListPointsPage verifies that ListPointsPage fetches the total via
+// points/count (with the same filter) and exactly one scroll page via the
+// integer offset — never a full-collection scroll.
+func TestQdrantListPointsPage(t *testing.T) {
+	type req struct {
+		path string
+		body map[string]any
+	}
+	var reqs []req
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		reqs = append(reqs, req{path: r.URL.Path, body: body})
+
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/points/count"):
+			json.NewEncoder(w).Encode(map[string]any{
+				"result": map[string]any{"count": 42},
+			})
+		case strings.HasSuffix(r.URL.Path, "/points/scroll"):
+			json.NewEncoder(w).Encode(map[string]any{
+				"result": map[string]any{
+					"points": []any{
+						map[string]any{
+							"id": "uuid-1",
+							"payload": map[string]any{
+								"content":     strings.Repeat("c", 500),
+								"doc_id":      "doc-1",
+								"source_file": "a.go",
+							},
+						},
+					},
+				},
+			})
+		default:
+			json.NewEncoder(w).Encode(map[string]any{"result": map[string]any{}})
+		}
+	}))
+	defer srv.Close()
+
+	p, err := NewQdrantProvider(context.Background(), srv.URL, "", &mockQueryEmbedder{})
+	if err != nil {
+		t.Fatalf("NewQdrantProvider: %v", err)
+	}
+	defer p.Close()
+
+	points, total, err := p.ListPointsPage(context.Background(), "proj", map[string]string{"source_file": "a.go"}, 50, 10)
+	if err != nil {
+		t.Fatalf("ListPointsPage: %v", err)
+	}
+	if total != 42 {
+		t.Errorf("expected total 42, got %d", total)
+	}
+	if len(points) != 1 || points[0].ID != "uuid-1" || points[0].DocID != "doc-1" {
+		t.Fatalf("unexpected page: %+v", points)
+	}
+	if len(points[0].Content) > 200 {
+		t.Errorf("expected content preview <= 200 chars, got %d", len(points[0].Content))
+	}
+
+	// Verify request shapes: count carries the filter; scroll carries
+	// limit+offset (not next_page_offset chaining).
+	var sawCount, sawScroll bool
+	for _, r := range reqs {
+		switch {
+		case strings.HasSuffix(r.path, "/points/count"):
+			sawCount = true
+			f, ok := r.body["filter"].(map[string]any)
+			if !ok {
+				t.Fatalf("count request should carry the meta filter, got %v", r.body)
+			}
+			must, _ := f["must"].([]any)
+			if len(must) != 1 {
+				t.Errorf("expected 1 must clause, got %v", f)
+			}
+		case strings.HasSuffix(r.path, "/points/scroll"):
+			sawScroll = true
+			if r.body["limit"].(float64) != 50 || r.body["offset"].(float64) != 10 {
+				t.Errorf("scroll body should carry limit=50 offset=10, got %v", r.body)
+			}
+		}
+	}
+	if !sawCount || !sawScroll {
+		t.Errorf("expected one count and one scroll request, got %d request(s)", len(reqs))
 	}
 }

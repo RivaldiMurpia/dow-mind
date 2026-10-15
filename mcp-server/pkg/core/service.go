@@ -555,8 +555,79 @@ func (s *Service) DeleteProject(ctx context.Context, projectID string) error {
 	return nil
 }
 
+// List-points pagination controls for the mind_list_points MCP tool and the
+// paged listing API. Pages keep a single tool call from pulling an entire
+// large collection into the transcript.
+const (
+	// DefaultListPointsLimit is the page size used when the caller does not
+	// specify a limit.
+	DefaultListPointsLimit = 50
+	// MaxListPointsLimit caps the page size; values above it are clamped, not
+	// rejected, so an over-eager caller still cannot pull the whole collection.
+	MaxListPointsLimit = 500
+	// PointPreviewMaxChars bounds the content preview in list output. Full
+	// content stays available via search / retrieve / export.
+	PointPreviewMaxChars = 300
+)
+
+// ListPointsPaged returns one page of points (ID + metadata + content
+// preview) plus the TOTAL number of points matching the filter, so callers
+// can page with offset without a separate count call. limit<=0 uses
+// DefaultListPointsLimit; limit>MaxListPointsLimit is clamped. Providers that
+// implement rag.PointPager are paged server-side; others fall back to a full
+// ListPoints sliced in memory (correct, but O(n) per page).
+func (s *Service) ListPointsPaged(ctx context.Context, projectID string, metaFilter map[string]string, limit, offset int) ([]rag.PointInfo, int, error) {
+	if limit <= 0 {
+		limit = DefaultListPointsLimit
+	}
+	if limit > MaxListPointsLimit {
+		limit = MaxListPointsLimit
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	if pager, ok := s.provider.(rag.PointPager); ok {
+		points, total, err := pager.ListPointsPage(ctx, projectID, metaFilter, limit, offset)
+		if err != nil {
+			return nil, 0, err
+		}
+		clampPointPreviews(points)
+		return points, total, nil
+	}
+
+	// Fallback for providers without page support: scroll everything, then
+	// slice the requested page in memory.
+	all, err := s.provider.ListPoints(ctx, projectID, metaFilter)
+	if err != nil {
+		return nil, 0, err
+	}
+	total := len(all)
+	if offset >= total {
+		return []rag.PointInfo{}, total, nil
+	}
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+	page := all[offset:end]
+	clampPointPreviews(page)
+	return page, total, nil
+}
+
+// clampPointPreviews truncates each point's Content in place to
+// PointPreviewMaxChars so list output stays bounded regardless of backend.
+func clampPointPreviews(points []rag.PointInfo) {
+	for i := range points {
+		if len(points[i].Content) > PointPreviewMaxChars {
+			points[i].Content = points[i].Content[:PointPreviewMaxChars]
+		}
+	}
+}
+
 // ListPoints returns all points (ID + metadata) in the project collection,
-// optionally filtered by metadata.
+// optionally filtered by metadata. Prefer ListPointsPaged for user-facing
+// listing: it bounds both page size and content preview.
 func (s *Service) ListPoints(ctx context.Context, projectID string, metaFilter map[string]string) ([]rag.PointInfo, error) {
 	return s.provider.ListPoints(ctx, projectID, metaFilter)
 }

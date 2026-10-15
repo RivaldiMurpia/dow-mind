@@ -125,6 +125,20 @@ type Exporter interface {
 	ExportPoints(ctx context.Context, projectID string) ([]Document, error)
 }
 
+// PointPager is an optional extension interface for providers that support
+// page-wise listing of points without scrolling the whole collection. The
+// first page call should pass offset=0; the returned total lets callers page
+// deterministically (offset += limit until offset >= total). Providers that
+// do not implement it fall back to a full ListPoints + in-memory slice in
+// core.Service, which is correct but O(n) per page.
+type PointPager interface {
+	// ListPointsPage returns up to limit points starting at offset (skipping
+	// that many matching points), plus the TOTAL number of points matching
+	// metaFilter. limit and offset arrive already validated/clamped by the
+	// service layer.
+	ListPointsPage(ctx context.Context, projectID string, metaFilter map[string]string, limit, offset int) ([]PointInfo, int, error)
+}
+
 // PointInfo is a stored point's ID together with the payload fields needed to
 // reconcile it against the current file set during incremental sync. Content
 // and ChunkIndex are populated by ListPoints when the UI needs to display

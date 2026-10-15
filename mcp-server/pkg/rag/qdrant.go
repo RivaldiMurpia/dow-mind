@@ -256,17 +256,57 @@ func (p *QdrantProvider) ListPointIDs(ctx context.Context, projectID string, met
 	return ids, nil
 }
 
-// ListPoints scrolls all points (optionally filtered by metadata), returning
-// each point's Qdrant ID and its source_file, content_hash, and doc_id payload.
-func (p *QdrantProvider) ListPoints(ctx context.Context, projectID string, metaFilter map[string]string) ([]PointInfo, error) {
-	name := p.collectionName(projectID)
-	must := []map[string]any{}
+// mustFilter converts a string meta filter into a Qdrant "must" filter list.
+// Returns nil when metaFilter is empty.
+func mustFilter(metaFilter map[string]string) []map[string]any {
+	if len(metaFilter) == 0 {
+		return nil
+	}
+	must := make([]map[string]any, 0, len(metaFilter))
 	for k, v := range metaFilter {
 		must = append(must, map[string]any{
 			"key":   k,
 			"match": map[string]any{"value": v},
 		})
 	}
+	return must
+}
+
+// pointInfoFromPayload maps a scrolled point (ID + payload) to a PointInfo,
+// keeping the string payload fields the listing/sync flows rely on. The
+// content is truncated to a short preview; full content is available via
+// search or export.
+func pointInfoFromPayload(rawID any, payload map[string]any) PointInfo {
+	pi := PointInfo{
+		ID: fmt.Sprintf("%v", rawID),
+	}
+	if v, ok := payload["source_file"].(string); ok {
+		pi.SourceFile = v
+	}
+	if v, ok := payload["content_hash"].(string); ok {
+		pi.ContentHash = v
+	}
+	if v, ok := payload["doc_id"].(string); ok {
+		pi.DocID = v
+	}
+	if v, ok := payload["content"].(string); ok {
+		if len(v) > 200 {
+			pi.Content = v[:200]
+		} else {
+			pi.Content = v
+		}
+	}
+	if v, ok := payload["chunk_index"].(string); ok {
+		pi.ChunkIndex = v
+	}
+	return pi
+}
+
+// ListPoints scrolls all points (optionally filtered by metadata), returning
+// each point's Qdrant ID and its source_file, content_hash, and doc_id payload.
+func (p *QdrantProvider) ListPoints(ctx context.Context, projectID string, metaFilter map[string]string) ([]PointInfo, error) {
+	name := p.collectionName(projectID)
+	must := mustFilter(metaFilter)
 
 	var all []PointInfo
 	var scrollOffset any = nil
@@ -286,7 +326,7 @@ func (p *QdrantProvider) ListPoints(ctx context.Context, projectID string, metaF
 		var resp struct {
 			Result struct {
 				Points []struct {
-					ID      any `json:"id"`
+					ID      any            `json:"id"`
 					Payload map[string]any `json:"payload"`
 				} `json:"points"`
 				NextOffset any `json:"next_page_offset"`
@@ -296,29 +336,7 @@ func (p *QdrantProvider) ListPoints(ctx context.Context, projectID string, metaF
 			return nil, fmt.Errorf("qdrant scroll: %w", err)
 		}
 		for _, pt := range resp.Result.Points {
-			pi := PointInfo{
-				ID: fmt.Sprintf("%v", pt.ID),
-			}
-			if v, ok := pt.Payload["source_file"].(string); ok {
-				pi.SourceFile = v
-			}
-			if v, ok := pt.Payload["content_hash"].(string); ok {
-				pi.ContentHash = v
-			}
-			if v, ok := pt.Payload["doc_id"].(string); ok {
-				pi.DocID = v
-			}
-			if v, ok := pt.Payload["content"].(string); ok {
-				if len(v) > 200 {
-					pi.Content = v[:200]
-				} else {
-					pi.Content = v
-				}
-			}
-			if v, ok := pt.Payload["chunk_index"].(string); ok {
-				pi.ChunkIndex = v
-			}
-			all = append(all, pi)
+			all = append(all, pointInfoFromPayload(pt.ID, pt.Payload))
 		}
 		if resp.Result.NextOffset == nil {
 			break
@@ -326,6 +344,65 @@ func (p *QdrantProvider) ListPoints(ctx context.Context, projectID string, metaF
 		scrollOffset = resp.Result.NextOffset
 	}
 	return all, nil
+}
+
+// ListPointsPage returns one page of points plus the total number of points
+// matching the filter. Implements rag.PointPager: the page comes from the
+// scroll API's integer offset and the total from points/count with the same
+// filter, so a large collection can be paged without ever scrolling it whole.
+// A missing collection counts as an empty project (total=0, no error).
+func (p *QdrantProvider) ListPointsPage(ctx context.Context, projectID string, metaFilter map[string]string, limit, offset int) ([]PointInfo, int, error) {
+	name := p.collectionName(projectID)
+	must := mustFilter(metaFilter)
+
+	// Total matching points via points/count (cheap, same filter).
+	countBody := map[string]any{"exact": true}
+	if must != nil {
+		countBody["filter"] = map[string]any{"must": must}
+	}
+	var countResp struct {
+		Result struct {
+			Count int `json:"count"`
+		} `json:"result"`
+	}
+	if err := p.do(ctx, http.MethodPost, "/collections/"+name+"/points/count", countBody, &countResp); err != nil {
+		// Treat a missing collection as an empty project rather than an error.
+		if strings.Contains(err.Error(), "404") {
+			return []PointInfo{}, 0, nil
+		}
+		return nil, 0, fmt.Errorf("qdrant count: %w", err)
+	}
+	total := countResp.Result.Count
+
+	if limit <= 0 || offset >= total {
+		return []PointInfo{}, total, nil
+	}
+
+	body := map[string]any{
+		"limit":        limit,
+		"offset":       offset,
+		"with_payload": true,
+		"with_vector":  false,
+	}
+	if must != nil {
+		body["filter"] = map[string]any{"must": must}
+	}
+	var resp struct {
+		Result struct {
+			Points []struct {
+				ID      any            `json:"id"`
+				Payload map[string]any `json:"payload"`
+			} `json:"points"`
+		} `json:"result"`
+	}
+	if err := p.do(ctx, http.MethodPost, "/collections/"+name+"/points/scroll", body, &resp); err != nil {
+		return nil, total, fmt.Errorf("qdrant scroll: %w", err)
+	}
+	page := make([]PointInfo, 0, len(resp.Result.Points))
+	for _, pt := range resp.Result.Points {
+		page = append(page, pointInfoFromPayload(pt.ID, pt.Payload))
+	}
+	return page, total, nil
 }
 
 // ExportPoints scrolls every point with full payload and returns Documents with
