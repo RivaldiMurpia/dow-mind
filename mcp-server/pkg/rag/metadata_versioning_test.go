@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -299,5 +300,104 @@ func TestQdrantIndexInjectsCurrentEmbedModel(t *testing.T) {
 	// Non-identity metadata still flows through.
 	if payload["doc_id"] != "d1" {
 		t.Errorf("doc_id = %v, want d1", payload["doc_id"])
+	}
+}
+
+// TestQdrantIndexInjectsCreatedAtAndAuthor verifies provenance injection:
+// created_at (RFC3339) is stamped when absent, author falls back to
+// DOWMIND_DEFAULT_AUTHOR, and values already present in metadata are kept.
+func TestQdrantIndexInjectsCreatedAtAndAuthor(t *testing.T) {
+	var payloads []map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/points") && r.Method == http.MethodPut {
+			var body struct {
+				Points []struct {
+					Payload map[string]any `json:"payload"`
+				} `json:"points"`
+			}
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			for _, p := range body.Points {
+				payloads = append(payloads, p.Payload)
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"result": map[string]any{}})
+	}))
+	defer srv.Close()
+
+	t.Setenv("DOWMIND_DEFAULT_AUTHOR", "dowarch")
+	p, err := NewQdrantProvider(context.Background(), srv.URL, "", namedMockEmbedder{})
+	if err != nil {
+		t.Fatalf("NewQdrantProvider: %v", err)
+	}
+	defer p.Close()
+
+	err = p.Index(context.Background(), "proj", []Document{
+		{ID: "d1", Content: "no provenance in meta"},
+		{ID: "d2", Content: "with provenance", Meta: map[string]string{
+			"created_at": "2026-01-01T00:00:00Z", "author": "ipol",
+		}},
+	})
+	if err != nil {
+		t.Fatalf("Index: %v", err)
+	}
+	if len(payloads) != 2 {
+		t.Fatalf("want 2 payloads, got %d", len(payloads))
+	}
+	// d1: injected.
+	ts, ok := payloads[0]["created_at"].(string)
+	if !ok {
+		t.Fatalf("d1 missing created_at: %v", payloads[0])
+	}
+	if _, err := time.Parse(time.RFC3339, ts); err != nil {
+		t.Errorf("d1 created_at %q is not RFC3339: %v", ts, err)
+	}
+	if payloads[0]["author"] != "dowarch" {
+		t.Errorf("d1 author = %v, want dowarch (env fallback)", payloads[0]["author"])
+	}
+	// d2: caller-supplied values preserved.
+	if payloads[1]["created_at"] != "2026-01-01T00:00:00Z" {
+		t.Errorf("d2 created_at overwritten: %v", payloads[1]["created_at"])
+	}
+	if payloads[1]["author"] != "ipol" {
+		t.Errorf("d2 author overwritten: %v", payloads[1]["author"])
+	}
+}
+
+// TestQdrantSetPayloadByDocID verifies the supersede write path targets the
+// points/payload endpoint with a doc_id filter and the expected payload.
+func TestQdrantSetPayloadByDocID(t *testing.T) {
+	var body map[string]any
+	var path string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/points/payload") {
+			path = r.URL.Path
+			_ = json.NewDecoder(r.Body).Decode(&body)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"result": map[string]any{}})
+	}))
+	defer srv.Close()
+
+	p, err := NewQdrantProvider(context.Background(), srv.URL, "", namedMockEmbedder{})
+	if err != nil {
+		t.Fatalf("NewQdrantProvider: %v", err)
+	}
+	defer p.Close()
+
+	err = p.SetPayloadByDocID(context.Background(), "proj", "lesson-v1",
+		map[string]any{"superseded_by": "lesson-v2"})
+	if err != nil {
+		t.Fatalf("SetPayloadByDocID: %v", err)
+	}
+	if !strings.Contains(fmt.Sprintf("%v", body["payload"]), "lesson-v2") {
+		t.Errorf("payload = %v, want superseded_by lesson-v2", body["payload"])
+	}
+	filterDump := fmt.Sprintf("%v", body["filter"])
+	if !strings.Contains(filterDump, "doc_id") || !strings.Contains(filterDump, "lesson-v1") {
+		t.Errorf("filter = %v, want doc_id match lesson-v1", body["filter"])
+	}
+	if !strings.Contains(path, "/collections/") {
+		t.Errorf("unexpected path %q", path)
 	}
 }

@@ -1513,3 +1513,139 @@ func TestListPointsPagedFallbackSlicesInMemory(t *testing.T) {
 		t.Errorf("expected single point 'b' / total 3, got %v / %d", points, total)
 	}
 }
+
+// supersedingMockProvider additionally implements rag.PointPayloadUpdater so
+// supersede bookkeeping can be observed.
+type supersedingMockProvider struct {
+	mockProvider
+	mu           sync.Mutex
+	payloadCalls []payloadCall
+}
+
+type payloadCall struct {
+	docID   string
+	payload map[string]any
+}
+
+func (m *supersedingMockProvider) SetPayloadByDocID(ctx context.Context, projectID, docID string, payload map[string]any) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.payloadCalls = append(m.payloadCalls, payloadCall{docID: docID, payload: payload})
+	return nil
+}
+
+// TestSearchSkipsSupersededByDefault verifies the default skip: results whose
+// metadata carries superseded_by are dropped unless IncludeSuperseded is set.
+func TestSearchSkipsSupersededByDefault(t *testing.T) {
+	s := NewService(&mockProvider{results: []rag.Result{
+		{ID: "live", Content: "current truth", Score: 0.9, Meta: map[string]string{}},
+		{ID: "old", Content: "stale memory", Score: 0.95, Meta: map[string]string{"superseded_by": "live"}},
+	}}, nil, nil)
+
+	// Default: superseded result is skipped even though it scored higher.
+	got, err := s.Search(context.Background(), "p", "q", SearchOpts{K: 5})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	if len(got) != 1 || got[0].ID != "live" {
+		t.Fatalf("want only [live], got %+v", idsOf(got))
+	}
+
+	// Opt-in flag restores visibility (audit use case).
+	got, err = s.Search(context.Background(), "p", "q", SearchOpts{K: 5, IncludeSuperseded: true})
+	if err != nil {
+		t.Fatalf("Search include: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("IncludeSuperseded: want 2 results, got %d", len(got))
+	}
+}
+
+// TestSearchStampsAge verifies every result with a parseable created_at gets
+// a human-readable age in its metadata.
+func TestSearchStampsAge(t *testing.T) {
+	fresh := time.Now().UTC().Add(-2 * time.Hour).Format(time.RFC3339)
+	old := time.Now().UTC().Add(-90 * 24 * time.Hour).Format(time.RFC3339)
+	s := NewService(&mockProvider{results: []rag.Result{
+		{ID: "fresh", Score: 0.9, Meta: map[string]string{"created_at": fresh}},
+		{ID: "old", Score: 0.8, Meta: map[string]string{"created_at": old}},
+		{ID: "undated", Score: 0.7, Meta: map[string]string{}},
+		{ID: "badts", Score: 0.6, Meta: map[string]string{"created_at": "not-a-time"}},
+	}}, nil, nil)
+	got, err := s.Search(context.Background(), "p", "q", SearchOpts{K: 10})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	byID := map[string]rag.Result{}
+	for _, r := range got {
+		byID[r.ID] = r
+	}
+	if byID["fresh"].Meta["age"] != "2h" {
+		t.Errorf("fresh age = %q, want 2h", byID["fresh"].Meta["age"])
+	}
+	if byID["old"].Meta["age"] != "90d" {
+		t.Errorf("old age = %q, want 90d", byID["old"].Meta["age"])
+	}
+	if _, ok := byID["undated"].Meta["age"]; ok {
+		t.Error("undated result should not carry age")
+	}
+	if _, ok := byID["badts"].Meta["age"]; ok {
+		t.Error("unparseable created_at should not carry age")
+	}
+}
+
+// TestIndexDocumentsSupersedes verifies the write side: the old document's
+// points get superseded_by=<new doc id> via the provider's payload updater.
+func TestIndexDocumentsSupersedes(t *testing.T) {
+	mp := &supersedingMockProvider{}
+	mp.results = nil
+	s := NewService(mp, nil, nil)
+
+	err := s.IndexDocuments(context.Background(), "p", []rag.Document{
+		{ID: "lesson-v2", Content: "updated lesson", Meta: map[string]string{"supersedes": "lesson-v1"}},
+	})
+	if err != nil {
+		t.Fatalf("IndexDocuments: %v", err)
+	}
+	if len(mp.payloadCalls) != 1 {
+		t.Fatalf("want 1 SetPayloadByDocID call, got %d", len(mp.payloadCalls))
+	}
+	c := mp.payloadCalls[0]
+	if c.docID != "lesson-v1" {
+		t.Errorf("supersede target = %q, want lesson-v1", c.docID)
+	}
+	if c.payload["superseded_by"] != "lesson-v2" {
+		t.Errorf("superseded_by = %v, want lesson-v2", c.payload["superseded_by"])
+	}
+
+	// Documents without supersedes trigger no payload updates.
+	mp.payloadCalls = nil
+	err = s.IndexDocuments(context.Background(), "p", []rag.Document{{ID: "plain", Content: "no supersede"}})
+	if err != nil {
+		t.Fatalf("IndexDocuments plain: %v", err)
+	}
+	if len(mp.payloadCalls) != 0 {
+		t.Errorf("plain index should not touch payload, got %+v", mp.payloadCalls)
+	}
+}
+
+// TestIndexDocumentsSupersedesUnsupported verifies an explicit error when the
+// backend cannot update payloads (instead of silently ignoring supersedes).
+func TestIndexDocumentsSupersedesUnsupported(t *testing.T) {
+	s := NewService(&mockProvider{}, nil, nil)
+	err := s.IndexDocuments(context.Background(), "p", []rag.Document{
+		{ID: "v2", Content: "x", Meta: map[string]string{"supersedes": "v1"}},
+	})
+	if err == nil || !strings.Contains(err.Error(), "does not support payload updates") {
+		t.Fatalf("want unsupported-backend error, got %v", err)
+	}
+}
+
+// idsOf returns result IDs in order (test helper).
+func idsOf(results []rag.Result) []string {
+	out := make([]string, len(results))
+	for i, r := range results {
+		out[i] = r.ID
+	}
+	return out
+}

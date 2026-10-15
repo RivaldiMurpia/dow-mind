@@ -158,48 +158,53 @@ type UnwatchProjectInput struct {
 type IndexProjectInput struct {
 	ProjectID string `json:"project_id" jsonschema:"Project identifier"`
 	Documents []struct {
-		ID      string            `json:"id" jsonschema:"Optional document ID; generated if empty"`
-		Content string            `json:"content" jsonschema:"Text to index"`
-		Meta    map[string]string `json:"meta" jsonschema:"Optional metadata key-value pairs"`
+		ID         string            `json:"id" jsonschema:"Optional document ID; generated if empty"`
+		Content    string            `json:"content" jsonschema:"Text to index"`
+		Meta       map[string]string `json:"meta" jsonschema:"Optional metadata key-value pairs"`
+		Author     string            `json:"author" jsonschema:"Optional provenance: who wrote this memory (e.g. dowarch, ipol, muse); falls back to DOWMIND_DEFAULT_AUTHOR"`
+		Supersedes string            `json:"supersedes" jsonschema:"Optional doc_id of an older document this one replaces; the old points get superseded_by set and are skipped by retrieval"`
 	} `json:"documents" jsonschema:"Documents to index into the project memory"`
 }
 
 type SemanticSearchInput struct {
-	ProjectID string  `json:"project_id" jsonschema:"Project identifier"`
-	Query     string  `json:"query" jsonschema:"Query text"`
-	Limit     int     `json:"limit" jsonschema:"Number of results to return (default 5)"`
-	Recall    int     `json:"recall" jsonschema:"Candidates retrieved before reranking (default 40)"`
-	Hybrid    *bool   `json:"hybrid" jsonschema:"Combine dense + lexical search when the backend supports it (default true)"`
-	Rerank    *bool   `json:"rerank" jsonschema:"Rerank candidates with the reranker when configured (default true)"`
-	Compress  bool    `json:"compress" jsonschema:"Drop near-duplicate results (default false)"`
-	MinScore  float64 `json:"min_score" jsonschema:"Relevance floor: drop results scoring below this, applied after reranking before the top-K cutoff (default 0 = off)"`
+	ProjectID         string  `json:"project_id" jsonschema:"Project identifier"`
+	Query             string  `json:"query" jsonschema:"Query text"`
+	Limit             int     `json:"limit" jsonschema:"Number of results to return (default 5)"`
+	Recall            int     `json:"recall" jsonschema:"Candidates retrieved before reranking (default 40)"`
+	Hybrid            *bool   `json:"hybrid" jsonschema:"Combine dense + lexical search when the backend supports it (default true)"`
+	Rerank            *bool   `json:"rerank" jsonschema:"Rerank candidates with the reranker when configured (default true)"`
+	Compress          bool    `json:"compress" jsonschema:"Drop near-duplicate results (default false)"`
+	MinScore          float64 `json:"min_score" jsonschema:"Relevance floor: drop results scoring below this, applied after reranking before the top-K cutoff (default 0 = off)"`
+	IncludeSuperseded bool    `json:"include_superseded" jsonschema:"Include points whose metadata marks them replaced by a newer document (superseded_by). Default false: superseded memories are skipped"`
 }
 
 type RetrieveContextInput struct {
-	ProjectID string  `json:"project_id" jsonschema:"Project identifier"`
-	Query     string  `json:"query" jsonschema:"Question or topic to retrieve context for"`
-	Limit     int     `json:"limit" jsonschema:"Number of chunks to retrieve (default 5)"`
-	Recall    int     `json:"recall" jsonschema:"Candidates retrieved before reranking (default 40)"`
-	Hybrid    *bool   `json:"hybrid" jsonschema:"Combine dense + lexical search when the backend supports it (default true)"`
-	Rerank    *bool   `json:"rerank" jsonschema:"Rerank candidates with the reranker when configured (default true)"`
-	Compress  bool    `json:"compress" jsonschema:"Drop near-duplicate results (default false)"`
-	MinScore  float64 `json:"min_score" jsonschema:"Relevance floor: drop results scoring below this, applied after reranking before the top-K cutoff (default 0 = off)"`
-	MaxChars  *int    `json:"max_chars" jsonschema:"Character budget for the concatenated context, applied best-first after ranking (default 8000, ~2k tokens); 0 = no cap. When the budget cuts chunks off, the context ends with a '[truncated: N chunks omitted]' marker"`
+	ProjectID         string  `json:"project_id" jsonschema:"Project identifier"`
+	Query             string  `json:"query" jsonschema:"Question or topic to retrieve context for"`
+	Limit             int     `json:"limit" jsonschema:"Number of chunks to retrieve (default 5)"`
+	Recall            int     `json:"recall" jsonschema:"Candidates retrieved before reranking (default 40)"`
+	Hybrid            *bool   `json:"hybrid" jsonschema:"Combine dense + lexical search when the backend supports it (default true)"`
+	Rerank            *bool   `json:"rerank" jsonschema:"Rerank candidates with the reranker when configured (default true)"`
+	Compress          bool    `json:"compress" jsonschema:"Drop near-duplicate results (default false)"`
+	MinScore          float64 `json:"min_score" jsonschema:"Relevance floor: drop results scoring below this, applied after reranking before the top-K cutoff (default 0 = off)"`
+	MaxChars          *int    `json:"max_chars" jsonschema:"Character budget for the concatenated context, applied best-first after ranking (default 8000, ~2k tokens); 0 = no cap. When the budget cuts chunks off, the context ends with a '[truncated: N chunks omitted]' marker"`
+	IncludeSuperseded bool    `json:"include_superseded" jsonschema:"Include points whose metadata marks them replaced by a newer document (superseded_by). Default false: superseded memories are skipped"`
 }
 
 // searchOptsFromMCP builds SearchOpts from MCP tool inputs. Hybrid and Rerank
 // default to true (nil pointer) so the built-in hybrid/rerank features are used
 // by default from MCP clients; they only take effect when the backend/reranker
 // supports them (otherwise Search falls back gracefully).
-func searchOptsFromMCP(limit, recall int, hybrid, rerank *bool, compress bool, minScore float64) core.SearchOpts {
+func searchOptsFromMCP(limit, recall int, hybrid, rerank *bool, compress bool, minScore float64, includeSuperseded bool) core.SearchOpts {
 	b := func(p *bool) bool { return p == nil || *p }
 	return core.SearchOpts{
-		K:        limit,
-		Recall:   recall,
-		Hybrid:   b(hybrid),
-		Rerank:   b(rerank),
-		Compress: compress,
-		MinScore: minScore,
+		K:                 limit,
+		Recall:            recall,
+		Hybrid:            b(hybrid),
+		Rerank:            b(rerank),
+		Compress:          compress,
+		MinScore:          minScore,
+		IncludeSuperseded: includeSuperseded,
 	}
 }
 
@@ -413,7 +418,7 @@ func registerMCPTools(server *mcp.Server, svc *core.Service) {
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "mind_index",
-		Description: "Index documents into a project collection. Documents larger than the chunk size are split with the same chunker as the directory scan flow; each chunk keeps the source document's metadata plus doc_id/chunk_index, and stays within the embedding model's input limit.",
+		Description: "Index documents into a project collection. Documents larger than the chunk size are split with the same chunker as the directory scan flow; each chunk keeps the source document's metadata plus doc_id/chunk_index, and stays within the embedding model's input limit. Every point gets provenance metadata: created_at (RFC3339, injected unless already present — migrations keep the original) and author (from the document input or DOWMIND_DEFAULT_AUTHOR). A document with supersedes set marks the old version's points as superseded; retrieval skips superseded points by default.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in IndexProjectInput) (*mcp.CallToolResult, any, error) {
 		docs := make([]rag.Document, len(in.Documents))
 		for i, d := range in.Documents {
@@ -427,9 +432,9 @@ func registerMCPTools(server *mcp.Server, svc *core.Service) {
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "mind_semantic_search",
-		Description: "Semantic search over a project collection. Returns the most relevant chunks with similarity scores.",
+		Description: "Semantic search over a project collection. Returns the most relevant chunks with similarity scores. Superseded points are skipped by default; each result carries created_at and age (e.g. '12d') so you know how stale the memory is.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in SemanticSearchInput) (*mcp.CallToolResult, any, error) {
-		opts := searchOptsFromMCP(in.Limit, in.Recall, in.Hybrid, in.Rerank, in.Compress, in.MinScore)
+		opts := searchOptsFromMCP(in.Limit, in.Recall, in.Hybrid, in.Rerank, in.Compress, in.MinScore, in.IncludeSuperseded)
 		res, err := svc.Search(ctx, in.ProjectID, in.Query, opts)
 		if err != nil {
 			return nil, nil, err
@@ -441,7 +446,7 @@ func registerMCPTools(server *mcp.Server, svc *core.Service) {
 		Name:        "mind_retrieve_context",
 		Description: "Retrieve a compact context string for a project. Fetches top chunks and concatenates them for LLM context, capped by max_chars (default 8000, ~2k tokens) applied best-first after ranking; when the budget cuts chunks off the context ends with '[truncated: N chunks omitted]'. Pass max_chars: 0 for no cap.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in RetrieveContextInput) (*mcp.CallToolResult, any, error) {
-		opts := searchOptsFromMCP(in.Limit, in.Recall, in.Hybrid, in.Rerank, in.Compress, in.MinScore)
+		opts := searchOptsFromMCP(in.Limit, in.Recall, in.Hybrid, in.Rerank, in.Compress, in.MinScore, in.IncludeSuperseded)
 		// Core convention: 0 = default budget, negative = no cap. MCP nil =
 		// default (leave 0); explicit 0 means "no cap" per the tool schema.
 		if in.MaxChars != nil && *in.MaxChars == 0 {
