@@ -1,12 +1,12 @@
 package rag
 
 import (
-	"strings"
 	"context"
 	"encoding/json"
 	"math"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -284,8 +284,8 @@ func TestQdrantListPointsPage(t *testing.T) {
 	if len(points) != 1 || points[0].ID != "uuid-1" || points[0].DocID != "doc-1" {
 		t.Fatalf("unexpected page: %+v", points)
 	}
-	if len(points[0].Content) > 200 {
-		t.Errorf("expected content preview <= 200 chars, got %d", len(points[0].Content))
+	if len(points[0].Content) > PointPreviewMaxChars {
+		t.Errorf("expected content preview <= %d chars, got %d", PointPreviewMaxChars, len(points[0].Content))
 	}
 
 	// Verify request shapes: count carries the filter; scroll carries

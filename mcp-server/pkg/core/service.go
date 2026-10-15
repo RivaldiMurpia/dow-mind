@@ -10,7 +10,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"unicode/utf8"
 
 	"github.com/google/uuid"
 
@@ -613,8 +612,9 @@ const (
 	// rejected, so an over-eager caller still cannot pull the whole collection.
 	MaxListPointsLimit = 500
 	// PointPreviewMaxChars bounds the content preview in list output. Full
-	// content stays available via search / retrieve / export.
-	PointPreviewMaxChars = 300
+	// content stays available via search / retrieve / export. Alias of the
+	// provider package constant so every layer truncates to the same length.
+	PointPreviewMaxChars = rag.PointPreviewMaxChars
 )
 
 // ListPointsPaged returns one page of points (ID + metadata + content
@@ -666,9 +666,7 @@ func (s *Service) ListPointsPaged(ctx context.Context, projectID string, metaFil
 // PointPreviewMaxChars so list output stays bounded regardless of backend.
 func clampPointPreviews(points []rag.PointInfo) {
 	for i := range points {
-		if len(points[i].Content) > PointPreviewMaxChars {
-			points[i].Content = points[i].Content[:PointPreviewMaxChars]
-		}
+		points[i].Content = rag.TruncateUTF8(points[i].Content, PointPreviewMaxChars)
 	}
 }
 
@@ -897,10 +895,7 @@ func (s *Service) RetrieveContext(ctx context.Context, projectID, query string, 
 			if i == 0 {
 				// Even the best chunk alone exceeds the budget: include it
 				// truncated rather than returning an empty context.
-				cut := part[:budget]
-				for len(cut) > 0 && !utf8.ValidString(cut) {
-					cut = cut[:len(cut)-1]
-				}
+				cut := rag.TruncateUTF8(part, budget)
 				b.WriteString(cut)
 				used = budget
 				kept = append(kept, r)

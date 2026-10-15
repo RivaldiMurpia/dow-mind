@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 )
@@ -399,5 +400,27 @@ func TestQdrantSetPayloadByDocID(t *testing.T) {
 	}
 	if !strings.Contains(path, "/collections/") {
 		t.Errorf("unexpected path %q", path)
+	}
+}
+
+// TestTruncateUTF8 verifies byte-budget truncation never splits a rune.
+func TestTruncateUTF8(t *testing.T) {
+	s := "héllo世界" // multibyte runes (é=2B, 世=3B, 界=3B)
+	got := TruncateUTF8(s, 4)
+	if !utf8.ValidString(got) {
+		t.Errorf("result not valid UTF-8: %q", got)
+	}
+	if !strings.HasPrefix(s, got) {
+		t.Errorf("truncated %q is not a prefix of %q", got, s)
+	}
+	if len(got) > 4 {
+		t.Errorf("length = %d, want <= 4", len(got))
+	}
+	if TruncateUTF8(s, len(s)+10) != s {
+		t.Error("no-op truncation changed the string")
+	}
+	// Cut exactly between runes keeps the full preceding rune.
+	if got := TruncateUTF8("ab世", 5); got != "ab世" {
+		t.Errorf("boundary cut = %q, want ab世", got)
 	}
 }

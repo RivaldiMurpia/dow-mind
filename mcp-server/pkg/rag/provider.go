@@ -2,7 +2,10 @@
 // The Provider interface is intentionally small: one project = one collection/index.
 package rag
 
-import "context"
+import (
+	"context"
+	"unicode/utf8"
+)
 
 // Document is a unit of content stored in a RAG collection.
 type Document struct {
@@ -137,6 +140,36 @@ type PointPager interface {
 	// metaFilter. limit and offset arrive already validated/clamped by the
 	// service layer.
 	ListPointsPage(ctx context.Context, projectID string, metaFilter map[string]string, limit, offset int) ([]PointInfo, int, error)
+}
+
+// PointPayloadUpdater is an optional provider extension for setting payload
+// fields on EXISTING points identified by their ORIGINAL doc_id. All stored
+// points sharing that doc_id (e.g. every chunk of a split document) are
+// updated. Used for supersede bookkeeping: when a new document supersedes an
+// old one, the old points are tagged superseded_by=<new doc id> so the
+// service can skip them in retrieval by default.
+type PointPayloadUpdater interface {
+	SetPayloadByDocID(ctx context.Context, projectID, docID string, payload map[string]any) error
+}
+
+// PointPreviewMaxChars bounds the content preview attached to point listings
+// across providers (kept identical to the core service clamp so every layer
+// truncates to the same length).
+const PointPreviewMaxChars = 300
+
+// TruncateUTF8 cuts s to at most max BYTES without splitting a rune: trailing
+// partial runes are trimmed so the result is always valid UTF-8. Preview
+// clamps that cut raw bytes can otherwise end mid-rune (e.g. bug-bounty
+// writeups full of multibyte characters) and produce garbage in output.
+func TruncateUTF8(s string, max int) string {
+	if len(s) <= max {
+		return s
+	}
+	cut := s[:max]
+	for len(cut) > 0 && !utf8.ValidString(cut) {
+		cut = cut[:len(cut)-1]
+	}
+	return cut
 }
 
 // PointInfo is a stored point's ID together with the payload fields needed to

@@ -9,7 +9,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -148,6 +150,19 @@ func (p *QdrantProvider) Index(ctx context.Context, projectID string, docs []Doc
 		// describe the embedding actually stored in this point.
 		payload["embed_model"] = embedModel
 		payload["embed_dim"] = embedDim
+		// Freshly stored points get provenance/age metadata. created_at is
+		// only set when absent so migrations and re-embeds preserve the
+		// ORIGINAL write time (an exported document carries its created_at
+		// through Meta). Same for author, which falls back to
+		// DOWMIND_DEFAULT_AUTHOR when the caller did not supply one.
+		if _, ok := payload["created_at"]; !ok {
+			payload["created_at"] = time.Now().UTC().Format(time.RFC3339)
+		}
+		if _, ok := payload["author"]; !ok {
+			if a := os.Getenv("DOWMIND_DEFAULT_AUTHOR"); a != "" {
+				payload["author"] = a
+			}
+		}
 		// Convert []float32 to []float64 for JSON
 		vec := make([]float64, len(vectors[i]))
 		for j, x := range vectors[i] {
@@ -191,8 +206,8 @@ func (p *QdrantProvider) SemanticSearch(ctx context.Context, projectID, query st
 	}
 
 	body := map[string]any{
-		"vector":      vec,
-		"limit":       limit,
+		"vector":       vec,
+		"limit":        limit,
 		"with_payload": true,
 	}
 
@@ -294,11 +309,9 @@ func pointInfoFromPayload(rawID any, payload map[string]any) PointInfo {
 		pi.DocID = v
 	}
 	if v, ok := payload["content"].(string); ok {
-		if len(v) > 200 {
-			pi.Content = v[:200]
-		} else {
-			pi.Content = v
-		}
+		// Same preview bound as the core service clamp; UTF-8 safe so
+		// multibyte content never ends mid-rune.
+		pi.Content = TruncateUTF8(v, PointPreviewMaxChars)
 	}
 	if v, ok := payload["chunk_index"].(string); ok {
 		pi.ChunkIndex = v
@@ -577,4 +590,22 @@ func sanitize(s string) string {
 		return hex.EncodeToString(h[:8])
 	}
 	return string(out)
+}
+
+// SetPayloadByDocID implements PointPayloadUpdater: it sets the given payload
+// fields on every stored point whose doc_id matches. Used by the service to
+// tag superseded documents (superseded_by=<new doc id>) across ALL chunks of
+// the old document without re-embedding or rewriting them.
+func (p *QdrantProvider) SetPayloadByDocID(ctx context.Context, projectID, docID string, payload map[string]any) error {
+	body := map[string]any{
+		"payload": payload,
+		"filter":  mustFilter(map[string]string{"doc_id": docID}),
+	}
+	var resp struct {
+		Result any `json:"result"`
+	}
+	if err := p.do(ctx, http.MethodPost, "/collections/"+p.collectionName(projectID)+"/points/payload?wait=true", body, &resp); err != nil {
+		return fmt.Errorf("qdrant set payload: %w", err)
+	}
+	return nil
 }
