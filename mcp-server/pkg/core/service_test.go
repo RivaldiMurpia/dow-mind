@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/RivaldiMurpia/dow-mind/pkg/indexer"
 	"github.com/RivaldiMurpia/dow-mind/pkg/rag"
 )
 
@@ -25,6 +27,8 @@ type mockProvider struct {
 	deletePtCalls    int
 	listPointsCalls  int
 	closeCalls       int
+
+	indexDocs []rag.Document // captured by Index for assertions
 
 	// Hybrid search tracking
 	hybridCalls int
@@ -65,6 +69,7 @@ func (m *mockProvider) DeleteCollection(ctx context.Context, projectID string) e
 func (m *mockProvider) Index(ctx context.Context, projectID string, docs []rag.Document) error {
 	m.mu.Lock()
 	m.indexCalls++
+	m.indexDocs = append(m.indexDocs, docs...)
 	m.mu.Unlock()
 	if m.indexErr != nil {
 		return m.indexErr
@@ -684,6 +689,102 @@ func TestIndexDocuments(t *testing.T) {
 	defer p.mu.Unlock()
 	if p.indexCalls != 1 {
 		t.Errorf("expected 1 Index call, got %d", p.indexCalls)
+	}
+	// Small documents must pass through unchanged (no chunking overhead).
+	if len(p.indexDocs) != 1 || p.indexDocs[0].ID != "d1" || p.indexDocs[0].Content != "hello" {
+		t.Errorf("small doc should be indexed unchanged, got %+v", p.indexDocs)
+	}
+}
+
+// TestIndexDocumentsChunksLargeDocuments verifies that a large document sent
+// through mind_index's path (Service.IndexDocuments) is split with the same
+// chunker as the scan flow: every chunk stays within the chunk-size bound,
+// carries the original doc_id + a sequential chunk_index, and the chunk IDs
+// derive from the original document ID.
+func TestIndexDocumentsChunksLargeDocuments(t *testing.T) {
+	p := &mockProvider{}
+	svc := NewService(p, nil, nil)
+
+	// ~100KB of paragraph-separated text (heuristic chunker path).
+	var sb strings.Builder
+	for i := 0; i < 800; i++ {
+		fmt.Fprintf(&sb, "Paragraph %d: %s\n\n", i, strings.Repeat("lorem ipsum dolor sit amet ", 8))
+	}
+	big := sb.String()
+	if len(big) < 90_000 {
+		t.Fatalf("test setup: expected ~100KB document, got %d bytes", len(big))
+	}
+
+	err := svc.IndexDocuments(context.Background(), "proj1", []rag.Document{
+		{ID: "big-doc", Content: big, Meta: map[string]string{"source": "manual"}},
+	})
+	if err != nil {
+		t.Fatalf("IndexDocuments error: %v", err)
+	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if len(p.indexDocs) <= 1 {
+		t.Fatalf("expected large doc to be split into many chunks, got %d", len(p.indexDocs))
+	}
+	// Overlap treatment (same as the scan flow) adds up to 200 chars of
+	// trailing context to chunks after the first.
+	maxLen := indexer.DefaultChunkSize + 200
+	for i, d := range p.indexDocs {
+		if len(d.Content) > maxLen {
+			t.Errorf("chunk %d len=%d exceeds bound %d", i, len(d.Content), maxLen)
+		}
+		if d.Meta["doc_id"] != "big-doc" {
+			t.Errorf("chunk %d doc_id=%q, want original 'big-doc'", i, d.Meta["doc_id"])
+		}
+		if d.Meta["chunk_index"] != strconv.Itoa(i) {
+			t.Errorf("chunk %d chunk_index=%q, want %d", i, d.Meta["chunk_index"], i)
+		}
+		if d.Meta["content_hash"] == "" {
+			t.Errorf("chunk %d missing content_hash", i)
+		}
+		if d.Meta["source"] != "manual" {
+			t.Errorf("chunk %d lost original metadata (source=%q)", i, d.Meta["source"])
+		}
+		wantID := fmt.Sprintf("big-doc#chunk%d", i)
+		if d.ID != wantID {
+			t.Errorf("chunk %d ID=%q, want %q", i, d.ID, wantID)
+		}
+	}
+	// First chunk must come from the start of the document.
+	if !strings.HasPrefix(p.indexDocs[0].Content, "Paragraph 0:") {
+		t.Errorf("first chunk should start at the document beginning, got %q", p.indexDocs[0].Content[:40])
+	}
+}
+
+// TestIndexDocumentsChunksWithoutID verifies ID-less large documents are
+// chunked too, with unique per-chunk IDs (no cross-chunk collision).
+func TestIndexDocumentsChunksWithoutID(t *testing.T) {
+	p := &mockProvider{}
+	svc := NewService(p, nil, nil)
+
+	big := strings.Repeat("line of text\n", 20_000) // ~260KB
+	err := svc.IndexDocuments(context.Background(), "proj1", []rag.Document{
+		{Content: big},
+	})
+	if err != nil {
+		t.Fatalf("IndexDocuments error: %v", err)
+	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if len(p.indexDocs) <= 1 {
+		t.Fatalf("expected chunking of ID-less large doc, got %d docs", len(p.indexDocs))
+	}
+	seen := make(map[string]struct{}, len(p.indexDocs))
+	for _, d := range p.indexDocs {
+		if _, dup := seen[d.ID]; dup {
+			t.Errorf("duplicate chunk ID %q — chunks would overwrite each other", d.ID)
+		}
+		seen[d.ID] = struct{}{}
+		if _, ok := d.Meta["doc_id"]; ok {
+			t.Errorf("ID-less doc should not claim a doc_id, got %q", d.Meta["doc_id"])
+		}
 	}
 }
 

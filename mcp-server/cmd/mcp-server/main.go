@@ -392,7 +392,7 @@ func registerMCPTools(server *mcp.Server, svc *core.Service) {
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "mind_index",
-		Description: "Index documents into a project collection. Each document is embedded and stored as a retrievable chunk.",
+		Description: "Index documents into a project collection. Documents larger than the chunk size are split with the same chunker as the directory scan flow; each chunk keeps the source document's metadata plus doc_id/chunk_index, and stays within the embedding model's input limit.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in IndexProjectInput) (*mcp.CallToolResult, any, error) {
 		docs := make([]rag.Document, len(in.Documents))
 		for i, d := range in.Documents {

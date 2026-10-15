@@ -33,6 +33,39 @@ func NewIndexer(provider rag.Provider, chunkSize int) *Indexer {
 	return &Indexer{provider: provider, chunkSize: chunkSize}
 }
 
+// ChunkSize returns the max characters per chunk this indexer uses.
+func (idx *Indexer) ChunkSize() int {
+	return idx.chunkSize
+}
+
+// DefaultChunkSize is the chunk size used when no Indexer is configured.
+// Matches NewIndexer's default: a chunk plus its "File: <path>" prefix stays
+// under the TEI embedding model's 512-token input limit (~3 chars/token).
+const DefaultChunkSize = 1000
+
+// ContentHash returns the short content hash used for chunk dedup metadata.
+// Exported so non-scan flows (e.g. mind_index via core.Service) can attach
+// the same content_hash metadata the scan flow produces.
+func ContentHash(content string) string {
+	return computeContentHash(content)
+}
+
+// ChunkDocument splits content with the same chunker the directory scan flow
+// uses: AST-aware chunking when the filename has a bundled tree-sitter
+// grammar, falling back to the heuristic splitter otherwise. filename may be
+// empty (forces the heuristic path). chunkSize <= 0 uses DefaultChunkSize.
+// Returned chunks carry the same overlap treatment as the scan flow.
+func ChunkDocument(filename, content string, chunkSize int) []string {
+	if chunkSize <= 0 {
+		chunkSize = DefaultChunkSize
+	}
+	chunks := chunkAST(filename, []byte(content), chunkSize)
+	if chunks == nil {
+		chunks = chunkCode(content, chunkSize)
+	}
+	return applyOverlap(chunks, defaultOverlapChars)
+}
+
 // Default ignore directories.
 var defaultIgnores = map[string]bool{
 	"node_modules": true,

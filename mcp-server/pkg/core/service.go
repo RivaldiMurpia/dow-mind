@@ -6,9 +6,12 @@ package core
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/RivaldiMurpia/dow-mind/pkg/indexer"
 	"github.com/RivaldiMurpia/dow-mind/pkg/rag"
@@ -685,9 +688,60 @@ func (s *Service) DeletePoints(ctx context.Context, projectID string, pointIDs [
 }
 
 // IndexDocuments indexes a batch of documents into the project collection
-// directly (without scanning a directory). This is used by the mind_index MCP tool.
+// directly (without scanning a directory). This is used by the mind_index MCP
+// tool. Documents larger than the chunk size are split with the SAME chunker
+// the directory scan flow uses (indexer.ChunkDocument); each resulting chunk
+// keeps the original document's metadata and gains doc_id / chunk_index /
+// content_hash so chunks remain attributable to their source document.
 func (s *Service) IndexDocuments(ctx context.Context, projectID string, docs []rag.Document) error {
-	if err := s.provider.Index(ctx, projectID, docs); err != nil {
+	chunked := make([]rag.Document, 0, len(docs))
+	chunkSize := indexer.DefaultChunkSize
+	if s.indexer != nil {
+		chunkSize = s.indexer.ChunkSize()
+	}
+
+	for _, d := range docs {
+		if len(d.Content) <= chunkSize {
+			chunked = append(chunked, d)
+			continue
+		}
+		// A missing doc ID would make every chunk collide on the same
+		// deterministic provider point ID ("<empty>#chunk0"), so generate one.
+		base := d.ID
+		if base == "" {
+			base = uuid.NewString()
+		}
+		// Source-file metadata (when present) lets AST chunking pick the
+		// right tree-sitter grammar; otherwise the heuristic splitter runs.
+		filename := ""
+		if d.Meta != nil {
+			filename = d.Meta["source_file"]
+		}
+		chunks := indexer.ChunkDocument(filename, d.Content, chunkSize)
+		if len(chunks) <= 1 {
+			// Nothing splittable — index the document unchanged.
+			chunked = append(chunked, d)
+			continue
+		}
+		for i, chunk := range chunks {
+			meta := make(map[string]string, len(d.Meta)+3)
+			for k, v := range d.Meta {
+				meta[k] = v
+			}
+			if d.ID != "" {
+				meta["doc_id"] = d.ID
+			}
+			meta["chunk_index"] = strconv.Itoa(i)
+			meta["content_hash"] = indexer.ContentHash(chunk)
+			chunked = append(chunked, rag.Document{
+				ID:      fmt.Sprintf("%s#chunk%d", base, i),
+				Content: chunk,
+				Meta:    meta,
+			})
+		}
+	}
+
+	if err := s.provider.Index(ctx, projectID, chunked); err != nil {
 		return fmt.Errorf("index documents: %w", err)
 	}
 	s.events.Publish(Event{
