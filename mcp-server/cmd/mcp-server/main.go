@@ -418,16 +418,21 @@ func registerMCPTools(server *mcp.Server, svc *core.Service) {
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "mind_index",
-		Description: "Index documents into a project collection. Documents larger than the chunk size are split with the same chunker as the directory scan flow; each chunk keeps the source document's metadata plus doc_id/chunk_index, and stays within the embedding model's input limit. Every point gets provenance metadata: created_at (RFC3339, injected unless already present — migrations keep the original) and author (from the document input or DOWMIND_DEFAULT_AUTHOR). A document with supersedes set marks the old version's points as superseded; retrieval skips superseded points by default.",
+		Description: "Index documents into a project collection. Documents larger than the chunk size are split with the same chunker as the directory scan flow; each chunk keeps the source document's metadata plus doc_id/chunk_index, and stays within the embedding model's input limit. Every point gets provenance metadata: created_at (RFC3339, injected unless already present — migrations keep the original) and author (from the document input or DOWMIND_DEFAULT_AUTHOR). A document with supersedes set marks the old version's points as superseded; retrieval skips superseded points by default. Near-duplicate writes (similarity >= 0.9 against existing points) are NOT inserted; the response reports them under duplicates — set meta force=true to insert anyway.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in IndexProjectInput) (*mcp.CallToolResult, any, error) {
 		docs := make([]rag.Document, len(in.Documents))
 		for i, d := range in.Documents {
 			docs[i] = rag.Document{ID: d.ID, Content: d.Content, Meta: d.Meta}
 		}
-		if err := svc.IndexDocuments(ctx, in.ProjectID, docs); err != nil {
+		report, err := svc.IndexDocuments(ctx, in.ProjectID, docs)
+		if err != nil {
 			return nil, nil, err
 		}
-		return nil, map[string]any{"status": "indexed", "count": len(docs)}, nil
+		resp := map[string]any{"status": "indexed", "count": report.Indexed}
+		if len(report.Duplicates) > 0 {
+			resp["duplicates"] = report.Duplicates
+		}
+		return nil, resp, nil
 	})
 
 	mcp.AddTool(server, &mcp.Tool{

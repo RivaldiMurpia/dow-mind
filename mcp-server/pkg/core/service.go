@@ -40,6 +40,11 @@ type SearchOpts struct {
 	// 0 = default (DefaultMaxContextChars), negative = no cap. Ignored by
 	// Search.
 	MaxChars int
+	// IncludeSuperseded disables the default skip of points whose metadata
+	// carries superseded_by (i.e. documents replaced by a newer write).
+	// Default false: superseded memories stay out of retrieval because a
+	// superseding document is, by definition, the current truth.
+	IncludeSuperseded bool
 }
 
 // ProjectStat holds per-project statistics returned by ListProjects.
@@ -302,6 +307,13 @@ func (s *Service) Search(ctx context.Context, projectID, query string, opts Sear
 	if err != nil {
 		return nil, err
 	}
+	// Superseded points are skipped by default (before reranking and the
+	// top-K cutoff, so K still counts only live results). This is where the
+	// episodic-memory protocol stays honest: a replaced memory must not
+	// resurface just because its embedding is still close to the query.
+	if !opts.IncludeSuperseded {
+		cands = dropSuperseded(cands)
+	}
 
 	hybridUsed := opts.Hybrid && s.providerSupportsHybrid()
 	comp := QueryComposition{
@@ -371,6 +383,7 @@ func (s *Service) Search(ctx context.Context, projectID, query string, opts Sear
 			comp.Reranked = true
 			comp.RerankMoved = rerankMoved(cands, reranked)
 			out = maybeCompress(reranked, opts.Compress)
+			stampAge(out)
 			return out, nil
 		}
 		// Reranker failed or returned empty: fall back to semantic order.
@@ -381,6 +394,7 @@ func (s *Service) Search(ctx context.Context, projectID, query string, opts Sear
 		cands = cands[:k]
 	}
 	out = maybeCompress(cands, opts.Compress)
+	stampAge(out)
 	return out, nil
 }
 
@@ -717,13 +731,40 @@ func (s *Service) DeletePoints(ctx context.Context, projectID string, pointIDs [
 	return nil
 }
 
+// DefaultDuplicateThreshold is the similarity score above which a new
+// document is considered a duplicate of an existing point and is NOT
+// inserted unless the caller forces it (meta["force"]=true). Score scales
+// are provider-specific but all current backends are cosine-based (0..1).
+const DefaultDuplicateThreshold = 0.9
+
+// DuplicateHit reports a document that was NOT indexed because it is too
+// similar to an existing point. duplicate_of is the existing point's ID.
+type DuplicateHit struct {
+	DocID       string  `json:"doc_id"`
+	DuplicateOf string  `json:"duplicate_of"`
+	Score       float64 `json:"score"`
+}
+
+// IndexReport is the outcome of a batch IndexDocuments call.
+type IndexReport struct {
+	Indexed    int            `json:"indexed"`    // documents actually stored
+	Duplicates []DuplicateHit `json:"duplicates"` // rejected as near-duplicates
+}
+
 // IndexDocuments indexes a batch of documents into the project collection
 // directly (without scanning a directory). This is used by the mind_index MCP
 // tool. Documents larger than the chunk size are split with the SAME chunker
 // the directory scan flow uses (indexer.ChunkDocument); each resulting chunk
 // keeps the original document's metadata and gains doc_id / chunk_index /
 // content_hash so chunks remain attributable to their source document.
-func (s *Service) IndexDocuments(ctx context.Context, projectID string, docs []rag.Document) error {
+//
+// Before writing, each document is checked against the project's existing
+// points: when the best match scores >= DefaultDuplicateThreshold the
+// document is NOT inserted and is reported as a duplicate. Set
+// meta["force"]="true" to insert anyway (superseding documents are exempt:
+// replacing a memory with near-identical text is the point of supersedes).
+func (s *Service) IndexDocuments(ctx context.Context, projectID string, docs []rag.Document) (IndexReport, error) {
+	var report IndexReport
 	chunked := make([]rag.Document, 0, len(docs))
 	chunkSize := indexer.DefaultChunkSize
 	if s.indexer != nil {
@@ -731,6 +772,32 @@ func (s *Service) IndexDocuments(ctx context.Context, projectID string, docs []r
 	}
 
 	for _, d := range docs {
+		// Dedup guard: compare against what is ALREADY stored. A superseding
+		// document intentionally re-states the old one, so it skips the check.
+		if d.Meta["force"] != "true" && d.Meta["supersedes"] == "" {
+			hits, err := s.provider.SemanticSearch(ctx, projectID, d.Content, 1)
+			if err != nil {
+				return report, fmt.Errorf("dedup check %q: %w", d.ID, err)
+			}
+			if len(hits) > 0 && hits[0].Score >= DefaultDuplicateThreshold {
+				report.Duplicates = append(report.Duplicates, DuplicateHit{
+					DocID:       d.ID,
+					DuplicateOf: hits[0].ID,
+					Score:       hits[0].Score,
+				})
+				continue
+			}
+		}
+		// force is write-time control input, not memory content: strip it so
+		// it does not leak into the stored payload.
+		if d.Meta["force"] != "" {
+			meta := make(map[string]string, len(d.Meta))
+			for k, v := range d.Meta {
+				meta[k] = v
+			}
+			delete(meta, "force")
+			d.Meta = meta
+		}
 		if len(d.Content) <= chunkSize {
 			chunked = append(chunked, d)
 			continue
@@ -771,15 +838,24 @@ func (s *Service) IndexDocuments(ctx context.Context, projectID string, docs []r
 		}
 	}
 
+	report.Indexed = len(chunked)
 	if err := s.provider.Index(ctx, projectID, chunked); err != nil {
-		return fmt.Errorf("index documents: %w", err)
+		return report, fmt.Errorf("index documents: %w", err)
+	}
+	// Supersede bookkeeping: a document whose metadata carries supersedes=<old
+	// doc id> tags every stored point of the OLD document with
+	// superseded_by=<new doc id>, so retrieval skips it by default. Done after
+	// the new points are durably stored so a failure here can never leave the
+	// corpus with BOTH copies hidden.
+	if err := s.applySupersedes(ctx, projectID, docs); err != nil {
+		return report, err
 	}
 	s.events.Publish(Event{
 		Type:      "documents_indexed",
 		Timestamp: time.Now(),
-		Data:      map[string]any{"project_id": projectID, "count": len(docs)},
+		Data:      map[string]any{"project_id": projectID, "count": len(docs), "duplicates": len(report.Duplicates)},
 	})
-	return nil
+	return report, nil
 }
 
 // DefaultMaxContextChars is the default character budget for
@@ -843,4 +919,91 @@ func (s *Service) RetrieveContext(ctx context.Context, projectID, query string, 
 		fmt.Fprintf(&b, "\n\n[truncated: %d chunks omitted]", omitted)
 	}
 	return b.String(), kept, nil
+}
+
+// dropSuperseded removes results whose metadata marks them as replaced by a
+// newer document (superseded_by). The filter returns a new slice so the
+// caller's candidate slice is never mutated.
+func dropSuperseded(results []rag.Result) []rag.Result {
+	out := results[:0:0]
+	for _, r := range results {
+		if r.Meta["superseded_by"] != "" {
+			continue
+		}
+		out = append(out, r)
+	}
+	return out
+}
+
+// stampAge annotates each result's metadata with a human-readable age derived
+// from its created_at timestamp (e.g. "5m", "3h", "12d"), so a consumer can
+// decide how much to trust a memory before verifying it against live state.
+// Results without a parseable created_at pass through untouched.
+func stampAge(results []rag.Result) {
+	now := time.Now()
+	for i := range results {
+		ts := results[i].Meta["created_at"]
+		if ts == "" {
+			continue
+		}
+		t, err := time.Parse(time.RFC3339, ts)
+		if err != nil {
+			continue
+		}
+		age := now.Sub(t)
+		if age < 0 {
+			age = 0
+		}
+		results[i].Meta["age"] = humanizeAge(age)
+	}
+}
+
+// humanizeAge renders a duration as a compact human string: seconds under a
+// minute, minutes under an hour, hours under two days, then days.
+func humanizeAge(d time.Duration) string {
+	switch {
+	case d < time.Minute:
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	case d < time.Hour:
+		return fmt.Sprintf("%dm", int(d.Minutes()))
+	case d < 48*time.Hour:
+		return fmt.Sprintf("%dh", int(d.Hours()))
+	default:
+		return fmt.Sprintf("%dd", int(d.Hours()/24))
+	}
+}
+
+// applySupersedes performs the write side of the supersede mechanism. The new
+// points are already durably stored when this runs; tagging the old ones
+// afterwards means a failure can hide at most the OLD copy, never both.
+func (s *Service) applySupersedes(ctx context.Context, projectID string, docs []rag.Document) error {
+	requested := false
+	for _, d := range docs {
+		if d.Meta["supersedes"] != "" {
+			requested = true
+			break
+		}
+	}
+	if !requested {
+		return nil
+	}
+	updater, ok := s.provider.(rag.PointPayloadUpdater)
+	if !ok {
+		return fmt.Errorf("supersedes: backend %s does not support payload updates", s.backend)
+	}
+	for _, d := range docs {
+		old := d.Meta["supersedes"]
+		if old == "" {
+			continue
+		}
+		if d.ID == "" {
+			return fmt.Errorf("supersedes %q: new document must have an explicit ID", old)
+		}
+		// The OLD points are tagged with the ID of the replacement document
+		// (its base ID; chunked documents keep it under each chunk's doc_id).
+		if err := updater.SetPayloadByDocID(ctx, projectID, old, map[string]any{"superseded_by": d.ID}); err != nil {
+			return fmt.Errorf("supersedes %q: %w", old, err)
+		}
+	}
+	return nil
 }

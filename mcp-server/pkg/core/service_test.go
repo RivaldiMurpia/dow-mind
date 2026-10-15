@@ -674,13 +674,13 @@ func TestListProjectsUsesCounter(t *testing.T) {
 
 // TestIndexDocuments delegates to provider.Index.
 func TestIndexDocuments(t *testing.T) {
-	p := &mockProvider{}
+	p := &mockProvider{results: []rag.Result{{ID: "existing", Score: 0.5}}}
 	svc := NewService(p, nil, nil)
 
 	docs := []rag.Document{
 		{ID: "d1", Content: "hello", Meta: map[string]string{"k": "v"}},
 	}
-	err := svc.IndexDocuments(context.Background(), "proj1", docs)
+	_, err := svc.IndexDocuments(context.Background(), "proj1", docs)
 	if err != nil {
 		t.Fatalf("IndexDocuments error: %v", err)
 	}
@@ -702,7 +702,7 @@ func TestIndexDocuments(t *testing.T) {
 // carries the original doc_id + a sequential chunk_index, and the chunk IDs
 // derive from the original document ID.
 func TestIndexDocumentsChunksLargeDocuments(t *testing.T) {
-	p := &mockProvider{}
+	p := &mockProvider{results: []rag.Result{{ID: "existing", Score: 0.5}}}
 	svc := NewService(p, nil, nil)
 
 	// ~100KB of paragraph-separated text (heuristic chunker path).
@@ -715,7 +715,7 @@ func TestIndexDocumentsChunksLargeDocuments(t *testing.T) {
 		t.Fatalf("test setup: expected ~100KB document, got %d bytes", len(big))
 	}
 
-	err := svc.IndexDocuments(context.Background(), "proj1", []rag.Document{
+	_, err := svc.IndexDocuments(context.Background(), "proj1", []rag.Document{
 		{ID: "big-doc", Content: big, Meta: map[string]string{"source": "manual"}},
 	})
 	if err != nil {
@@ -760,11 +760,11 @@ func TestIndexDocumentsChunksLargeDocuments(t *testing.T) {
 // TestIndexDocumentsChunksWithoutID verifies ID-less large documents are
 // chunked too, with unique per-chunk IDs (no cross-chunk collision).
 func TestIndexDocumentsChunksWithoutID(t *testing.T) {
-	p := &mockProvider{}
+	p := &mockProvider{results: []rag.Result{{ID: "existing", Score: 0.5}}}
 	svc := NewService(p, nil, nil)
 
 	big := strings.Repeat("line of text\n", 20_000) // ~260KB
-	err := svc.IndexDocuments(context.Background(), "proj1", []rag.Document{
+	_, err := svc.IndexDocuments(context.Background(), "proj1", []rag.Document{
 		{Content: big},
 	})
 	if err != nil {
@@ -1601,7 +1601,7 @@ func TestIndexDocumentsSupersedes(t *testing.T) {
 	mp.results = nil
 	s := NewService(mp, nil, nil)
 
-	err := s.IndexDocuments(context.Background(), "p", []rag.Document{
+	_, err := s.IndexDocuments(context.Background(), "p", []rag.Document{
 		{ID: "lesson-v2", Content: "updated lesson", Meta: map[string]string{"supersedes": "lesson-v1"}},
 	})
 	if err != nil {
@@ -1620,7 +1620,7 @@ func TestIndexDocumentsSupersedes(t *testing.T) {
 
 	// Documents without supersedes trigger no payload updates.
 	mp.payloadCalls = nil
-	err = s.IndexDocuments(context.Background(), "p", []rag.Document{{ID: "plain", Content: "no supersede"}})
+	_, err = s.IndexDocuments(context.Background(), "p", []rag.Document{{ID: "plain", Content: "no supersede"}})
 	if err != nil {
 		t.Fatalf("IndexDocuments plain: %v", err)
 	}
@@ -1633,7 +1633,7 @@ func TestIndexDocumentsSupersedes(t *testing.T) {
 // backend cannot update payloads (instead of silently ignoring supersedes).
 func TestIndexDocumentsSupersedesUnsupported(t *testing.T) {
 	s := NewService(&mockProvider{}, nil, nil)
-	err := s.IndexDocuments(context.Background(), "p", []rag.Document{
+	_, err := s.IndexDocuments(context.Background(), "p", []rag.Document{
 		{ID: "v2", Content: "x", Meta: map[string]string{"supersedes": "v1"}},
 	})
 	if err == nil || !strings.Contains(err.Error(), "does not support payload updates") {
@@ -1648,4 +1648,81 @@ func idsOf(results []rag.Result) []string {
 		out[i] = r.ID
 	}
 	return out
+}
+
+// TestIndexDocumentsDedupGuard verifies the write-time dedup: a document
+// whose best existing match scores >= DefaultDuplicateThreshold is NOT
+// inserted and is reported as duplicate_of the existing point; force=true
+// bypasses the guard; supersedes is exempt (replacing a memory with
+// near-identical text is the point of supersedes).
+func TestIndexDocumentsDedupGuard(t *testing.T) {
+	newSvc := func() (*mockProvider, *Service) {
+		p := &mockProvider{results: []rag.Result{{ID: "lesson-v1", Score: 0.95}}}
+		return p, NewService(p, nil, nil)
+	}
+
+	// Plain write: rejected as duplicate, provider.Index never sees it.
+	p, s := newSvc()
+	report, err := s.IndexDocuments(context.Background(), "p", []rag.Document{
+		{ID: "lesson-copy", Content: "same lesson again"},
+	})
+	if err != nil {
+		t.Fatalf("IndexDocuments: %v", err)
+	}
+	if report.Indexed != 0 || len(report.Duplicates) != 1 {
+		t.Fatalf("want 0 indexed + 1 duplicate, got %+v", report)
+	}
+	d := report.Duplicates[0]
+	if d.DocID != "lesson-copy" || d.DuplicateOf != "lesson-v1" || d.Score != 0.95 {
+		t.Errorf("duplicate hit = %+v", d)
+	}
+	p.mu.Lock()
+	if len(p.indexDocs) != 0 {
+		t.Errorf("duplicate must not reach provider.Index, got %d docs", len(p.indexDocs))
+	}
+	p.mu.Unlock()
+
+	// force=true bypasses the guard and strips the control key from storage.
+	p, s = newSvc()
+	report, err = s.IndexDocuments(context.Background(), "p", []rag.Document{
+		{ID: "lesson-copy", Content: "same lesson again", Meta: map[string]string{"force": "true"}},
+	})
+	if err != nil {
+		t.Fatalf("IndexDocuments force: %v", err)
+	}
+	if report.Indexed != 1 || len(report.Duplicates) != 0 {
+		t.Fatalf("force: want 1 indexed, got %+v", report)
+	}
+	p.mu.Lock()
+	if len(p.indexDocs) != 1 || p.indexDocs[0].Meta["force"] != "" {
+		t.Errorf("forced doc not stored cleanly: %+v", p.indexDocs)
+	}
+	p.mu.Unlock()
+
+	// Below threshold: inserted normally.
+	p, s = newSvc()
+	p.results = []rag.Result{{ID: "lesson-v1", Score: 0.5}}
+	report, err = s.IndexDocuments(context.Background(), "p", []rag.Document{
+		{ID: "lesson-new", Content: "actually different"},
+	})
+	if err != nil {
+		t.Fatalf("IndexDocuments below threshold: %v", err)
+	}
+	if report.Indexed != 1 || len(report.Duplicates) != 0 {
+		t.Fatalf("below threshold: want 1 indexed, got %+v", report)
+	}
+
+	// supersedes bypasses the dedup check (it re-states the old doc on purpose).
+	sp := &supersedingMockProvider{}
+	sp.results = []rag.Result{{ID: "lesson-v1", Score: 0.95}}
+	s = NewService(sp, nil, nil)
+	report, err = s.IndexDocuments(context.Background(), "p", []rag.Document{
+		{ID: "lesson-v2", Content: "same lesson again", Meta: map[string]string{"supersedes": "lesson-v1"}},
+	})
+	if err != nil {
+		t.Fatalf("IndexDocuments supersedes: %v", err)
+	}
+	if report.Indexed != 1 || len(report.Duplicates) != 0 {
+		t.Fatalf("supersedes: want 1 indexed (dedup exempt), got %+v", report)
+	}
 }
