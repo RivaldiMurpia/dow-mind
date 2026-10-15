@@ -1726,3 +1726,43 @@ func TestIndexDocumentsDedupGuard(t *testing.T) {
 		t.Fatalf("supersedes: want 1 indexed (dedup exempt), got %+v", report)
 	}
 }
+
+// TestIndexDocumentsDedupExactHash verifies the hash layer: an exact-text
+// duplicate is caught by content_hash even when the embedder is asymmetric
+// and vector similarity for identical text stays well below the threshold
+// (Voyage: ~0.75). The stored point also gains a content_hash so the guard
+// can recognize small documents later.
+func TestIndexDocumentsDedupExactHash(t *testing.T) {
+	p := &mockProvider{results: []rag.Result{{ID: "other", Score: 0.2}}} // vector layer sees nothing similar
+	s := NewService(p, nil, nil)
+
+	// First write stores the doc with a content_hash injected.
+	if _, err := s.IndexDocuments(context.Background(), "p", []rag.Document{
+		{ID: "lesson-1", Content: "moth exploit worked on /api/v9/render"},
+	}); err != nil {
+		t.Fatalf("first index: %v", err)
+	}
+	p.mu.Lock()
+	if got := p.indexDocs[0].Meta["content_hash"]; got != indexer.ContentHash("moth exploit worked on /api/v9/render") {
+		t.Fatalf("stored doc missing content_hash: %+v", p.indexDocs[0].Meta)
+	}
+	p.mu.Unlock()
+
+	// Simulate a provider listing that carries the matching hash: the second
+	// identical write is rejected via the hash layer despite low vector score.
+	hash := indexer.ContentHash("moth exploit worked on /api/v9/render")
+	p.points = []rag.PointInfo{{ID: "point-of-lesson-1", ContentHash: hash}}
+
+	report, err := s.IndexDocuments(context.Background(), "p", []rag.Document{
+		{ID: "lesson-1-again", Content: "moth exploit worked on /api/v9/render"},
+	})
+	if err != nil {
+		t.Fatalf("second index: %v", err)
+	}
+	if report.Indexed != 0 || len(report.Duplicates) != 1 {
+		t.Fatalf("want hash-layer duplicate, got %+v", report)
+	}
+	if d := report.Duplicates[0]; d.DuplicateOf != "point-of-lesson-1" || d.Score != 1.0 {
+		t.Errorf("duplicate hit = %+v, want duplicate_of point-of-lesson-1 score 1.0", d)
+	}
+}

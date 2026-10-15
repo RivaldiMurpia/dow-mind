@@ -743,6 +743,33 @@ type DuplicateHit struct {
 	Score       float64 `json:"score"`
 }
 
+// DuplicateHashScore is the score reported for an exact content_hash match:
+// identity, independent of the embedder's query/document asymmetry.
+const DuplicateHashScore = 1.0
+
+// findExactDuplicate reports the first stored point whose content_hash equals
+// the hash of d.Content (identity duplicate). Returns nil when the provider
+// errors or nothing matches — a lookup failure must not block the write; the
+// fuzzy vector layer still runs.
+func (s *Service) findExactDuplicate(ctx context.Context, projectID string, d rag.Document) *rag.Result {
+	hash := indexer.ContentHash(d.Content)
+	if hash == "" {
+		return nil
+	}
+	points, err := s.provider.ListPoints(ctx, projectID, map[string]string{"content_hash": hash})
+	if err != nil {
+		return nil
+	}
+	for i := range points {
+		// Verify the hash client-side too: the provider filter is best-effort
+		// and mocks/tests may ignore it.
+		if points[i].ContentHash == hash {
+			return &rag.Result{ID: points[i].ID, Content: points[i].Content, Score: DuplicateHashScore}
+		}
+	}
+	return nil
+}
+
 // IndexReport is the outcome of a batch IndexDocuments call.
 type IndexReport struct {
 	Indexed    int            `json:"indexed"`    // documents actually stored
@@ -772,16 +799,31 @@ func (s *Service) IndexDocuments(ctx context.Context, projectID string, docs []r
 	for _, d := range docs {
 		// Dedup guard: compare against what is ALREADY stored. A superseding
 		// document intentionally re-states the old one, so it skips the check.
+		//
+		// Layer 1 (exact): a stored point with the same content_hash IS the
+		// same text — decisive, cheap, and immune to asymmetric embedders
+		// (Voyage scores identical query/document text ~0.75 because query
+		// and document embeddings use different prompts).
+		// Layer 2 (fuzzy): vector similarity >= DefaultDuplicateThreshold
+		// catches close paraphrases; the meaningful threshold is embedder-
+		// dependent, so 0.9 only fires on near-verbatim text with symmetric
+		// embedders and very-close pairs otherwise.
 		if d.Meta["force"] != "true" && d.Meta["supersedes"] == "" {
-			hits, err := s.provider.SemanticSearch(ctx, projectID, d.Content, 1)
-			if err != nil {
-				return report, fmt.Errorf("dedup check %q: %w", d.ID, err)
+			dup := s.findExactDuplicate(ctx, projectID, d)
+			if dup == nil && s.provider != nil {
+				hits, err := s.provider.SemanticSearch(ctx, projectID, d.Content, 1)
+				if err != nil {
+					return report, fmt.Errorf("dedup check %q: %w", d.ID, err)
+				}
+				if len(hits) > 0 && hits[0].Score >= DefaultDuplicateThreshold {
+					dup = &hits[0]
+				}
 			}
-			if len(hits) > 0 && hits[0].Score >= DefaultDuplicateThreshold {
+			if dup != nil {
 				report.Duplicates = append(report.Duplicates, DuplicateHit{
 					DocID:       d.ID,
-					DuplicateOf: hits[0].ID,
-					Score:       hits[0].Score,
+					DuplicateOf: dup.ID,
+					Score:       dup.Score,
 				})
 				continue
 			}
@@ -797,6 +839,20 @@ func (s *Service) IndexDocuments(ctx context.Context, projectID string, docs []r
 			d.Meta = meta
 		}
 		if len(d.Content) <= chunkSize {
+			// Small documents pass through unchanged, but they still need a
+			// content_hash so the write-time dedup guard can recognize them
+			// later (chunks get theirs in the split path below).
+			if d.Meta == nil {
+				d.Meta = map[string]string{}
+			}
+			if d.Meta["content_hash"] == "" {
+				meta := make(map[string]string, len(d.Meta)+1)
+				for k, v := range d.Meta {
+					meta[k] = v
+				}
+				meta["content_hash"] = indexer.ContentHash(d.Content)
+				d.Meta = meta
+			}
 			chunked = append(chunked, d)
 			continue
 		}
