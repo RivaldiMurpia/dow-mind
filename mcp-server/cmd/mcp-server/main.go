@@ -17,6 +17,7 @@ import (
 	"github.com/RivaldiMurpia/dow-mind/pkg/core"
 	"github.com/RivaldiMurpia/dow-mind/pkg/httpapi"
 	"github.com/RivaldiMurpia/dow-mind/pkg/indexer"
+	"github.com/RivaldiMurpia/dow-mind/pkg/migrate"
 	"github.com/RivaldiMurpia/dow-mind/pkg/rag"
 	"github.com/RivaldiMurpia/dow-mind/pkg/ragbuild"
 	"github.com/RivaldiMurpia/dow-mind/web"
@@ -234,6 +235,13 @@ func main() {
 		runSetup(os.Args[2:])
 		return
 	}
+	// `dow-mind migrate --from <project> --to <project>` re-embeds every
+	// stored document of a project into a fresh destination collection via
+	// pkg/migrate (embedder swaps, dimension changes, backend moves).
+	if len(os.Args) > 1 && os.Args[1] == "migrate" {
+		runMigrate(os.Args[2:])
+		return
+	}
 	// `dow-mind version` / `--version` / `-v` prints the build version.
 	if len(os.Args) > 1 && (os.Args[1] == "version" || os.Args[1] == "--version" || os.Args[1] == "-v") {
 		fmt.Printf("dow-mind %s\n", resolvedVersion())
@@ -281,7 +289,16 @@ func main() {
 	}
 
 	svc := buildService(provider, reranker, idx)
-	svc.SetEmbedModel(cfg.VoyageModel)
+	// The stats label must name the ACTIVE embedder, not the Voyage config
+	// default (a TEI-backed server previously reported "voyage-4").
+	switch strings.ToLower(strings.TrimSpace(cfg.Embedder)) {
+	case "tei":
+		svc.SetEmbedModel("tei")
+	case "openai":
+		svc.SetEmbedModel(cfg.OpenAIModel)
+	default:
+		svc.SetEmbedModel(cfg.VoyageModel)
+	}
 	svc.SetBackend(cfg.VectorStore)
 
 	// Durable metrics: a local SQLite file (pure-Go, no cgo) that works with any
@@ -561,4 +578,48 @@ func registerMCPTools(server *mcp.Server, svc *core.Service) {
 		}
 		return nil, map[string]any{"status": "unwatched", "project_id": in.ProjectID}, nil
 	})
+}
+
+// runMigrate implements `dow-mind migrate --from <project> --to <project>`:
+// it exports every stored document of the source project and re-embeds it
+// into a fresh destination collection through the ACTIVE embedder (see
+// pkg/migrate). Use it to swap embedding models or dimensions — e.g. TEI
+// (384-dim) to Voyage (1024-dim) — without re-indexing from raw sources.
+// Migration across dimension changes requires a DIFFERENT destination project
+// (a collection cannot change vector size in place); delete the old
+// collection afterwards if the destination replaces it.
+func runMigrate(args []string) {
+	fs := flag.NewFlagSet("migrate", flag.ExitOnError)
+	from := fs.String("from", "", "source project ID (must exist)")
+	to := fs.String("to", "", "destination project ID (created if missing; must differ from --from when dimensions change)")
+	_ = fs.Parse(args)
+	if *from == "" || *to == "" {
+		fmt.Fprintln(os.Stderr, "usage: dow-mind migrate --from <project> --to <project>")
+		os.Exit(2)
+	}
+
+	cfg, err := resolveConfig()
+	if err != nil {
+		log.Fatalf("migrate: failed to resolve config: %v", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Minute)
+	defer cancel()
+	provider, err := buildProvider(ctx, cfg)
+	if err != nil {
+		log.Fatalf("migrate: failed to build provider: %v", err)
+	}
+	defer provider.Close()
+
+	exporter, ok := provider.(rag.Exporter)
+	if !ok {
+		log.Fatalf("migrate: backend %q does not support export", cfg.VectorStore)
+	}
+	m := &migrate.Migrator{Src: exporter, Dst: provider, BatchSize: 64}
+	n, err := m.Run(ctx, *from, *to, func(p migrate.Progress) {
+		fmt.Fprintf(os.Stderr, "migrate: %d/%d documents written\n", p.Done, p.Total)
+	})
+	if err != nil {
+		log.Fatalf("migrate: %v", err)
+	}
+	fmt.Printf("migrated %d documents from %q to %q (embedder=%s)\n", n, *from, *to, cfg.Embedder)
 }
