@@ -152,13 +152,15 @@ func (p *PGVectorProvider) Index(ctx context.Context, projectID string, docs []D
 		if id == "" {
 			id = uuid.NewString()
 		}
-		meta := map[string]string{
-			"embed_model": embedModel,
-			"embed_dim":   fmt.Sprintf("%d", embedDim),
-		}
+		meta := map[string]string{}
 		for k, v := range d.Meta {
 			meta[k] = v
 		}
+		// Injected identity fields are applied AFTER the metadata copy so
+		// stale embed_model/embed_dim from migrated documents (original
+		// backend) cannot override the values of the embedding stored here.
+		meta["embed_model"] = embedModel
+		meta["embed_dim"] = fmt.Sprintf("%d", embedDim)
 		batch.Queue(fmt.Sprintf(`
 INSERT INTO %s (id, project_id, content, metadata, embedding)
 VALUES ($1, $2, $3, $4, $5::vector)

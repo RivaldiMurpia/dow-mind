@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -237,5 +238,66 @@ func TestPGVectorIndexInjectsEmbedMetadata(t *testing.T) {
 	}
 	if meta["embed_dim"] != "3" {
 		t.Errorf("embed_dim = %q, want %q", meta["embed_dim"], "3")
+	}
+}
+
+// namedMockEmbedder is an EmbeddingClient + ModelNamer used to verify that
+// Index injects CURRENT embed identity even when document metadata carries
+// stale values from a previous backend (migration scenario).
+type namedMockEmbedder struct{}
+
+func (namedMockEmbedder) Embed(ctx context.Context, texts []string) ([][]float32, error) {
+	out := make([][]float32, len(texts))
+	for i := range out {
+		out[i] = []float32{0.1, 0.2, 0.3}
+	}
+	return out, nil
+}
+func (namedMockEmbedder) VectorSize() int   { return 1024 }
+func (namedMockEmbedder) ModelName() string { return "current-model" }
+
+// TestQdrantIndexInjectsCurrentEmbedModel verifies the injection order in
+// QdrantProvider.Index: document metadata (e.g. exported from a previous
+// embedder) must NOT override the embed_model/embed_dim describing the
+// embedding actually stored.
+func TestQdrantIndexInjectsCurrentEmbedModel(t *testing.T) {
+	var payload map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/points") && r.Method == http.MethodPut {
+			var body struct {
+				Points []struct {
+					Payload map[string]any `json:"payload"`
+				} `json:"points"`
+			}
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			payload = body.Points[0].Payload
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"result": map[string]any{}})
+	}))
+	defer srv.Close()
+
+	p, err := NewQdrantProvider(context.Background(), srv.URL, "", namedMockEmbedder{})
+	if err != nil {
+		t.Fatalf("NewQdrantProvider: %v", err)
+	}
+	defer p.Close()
+
+	err = p.Index(context.Background(), "proj", []Document{{
+		ID: "d1", Content: "hello",
+		Meta: map[string]string{"embed_model": "stale-old", "embed_dim": "384"},
+	}})
+	if err != nil {
+		t.Fatalf("Index: %v", err)
+	}
+	if payload["embed_model"] != "current-model" {
+		t.Errorf("embed_model = %v, want current-model (stale metadata must not win)", payload["embed_model"])
+	}
+	if payload["embed_dim"] != float64(1024) {
+		t.Errorf("embed_dim = %v, want 1024", payload["embed_dim"])
+	}
+	// Non-identity metadata still flows through.
+	if payload["doc_id"] != "d1" {
+		t.Errorf("doc_id = %v, want d1", payload["doc_id"])
 	}
 }

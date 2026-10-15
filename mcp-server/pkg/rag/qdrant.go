@@ -136,14 +136,18 @@ func (p *QdrantProvider) Index(ctx context.Context, projectID string, docs []Doc
 		}
 		id := pointID(rawID)
 		payload := map[string]any{
-			"content":     d.Content,
-			"doc_id":      rawID,
-			"embed_model": embedModel,
-			"embed_dim":   embedDim,
+			"content": d.Content,
+			"doc_id":  rawID,
 		}
 		for k, v := range d.Meta {
 			payload[k] = v
 		}
+		// Injected identity fields are applied AFTER the metadata copy:
+		// migrated/exported documents carry stale embed_model/embed_dim from
+		// their original backend, which must not override the values that
+		// describe the embedding actually stored in this point.
+		payload["embed_model"] = embedModel
+		payload["embed_dim"] = embedDim
 		// Convert []float32 to []float64 for JSON
 		vec := make([]float64, len(vectors[i]))
 		for j, x := range vectors[i] {

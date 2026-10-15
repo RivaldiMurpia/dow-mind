@@ -72,10 +72,15 @@ func (p *ChromaProvider) Index(ctx context.Context, projectID string, docs []Doc
 		if ids[i] == "" {
 			ids[i] = strings.ReplaceAll(fmt.Sprintf("%x", d.Content), "/", "_") // fallback deterministic
 		}
-		metas[i] = map[string]any{"content": d.Content, "embed_model": embedModel, "embed_dim": embedDim}
+		metas[i] = map[string]any{"content": d.Content}
 		for k, v := range d.Meta {
 			metas[i][k] = v
 		}
+		// Injected identity fields are applied AFTER the metadata copy so
+		// stale embed_model/embed_dim from migrated documents (original
+		// backend) cannot override the values of the embedding stored here.
+		metas[i]["embed_model"] = embedModel
+		metas[i]["embed_dim"] = embedDim
 	}
 
 	vectors, err := p.embedder.Embed(ctx, texts)
