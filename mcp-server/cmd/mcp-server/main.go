@@ -52,19 +52,19 @@ func resolvedVersion() string {
 // layer. It is populated from three sources with strict priority:
 // environment variables > config file (~/.dow-mind/config.yaml) > defaults.
 type RuntimeConfig struct {
-	VectorStore   string
-	Embedder      string
-	QdrantURL     string
-	QdrantAPIKey  string
-	ChromaURL     string
-	PGVectorDSN   string
-	TEIBaseURL    string
-	VoyageAPIKey  string
-	VoyageModel   string
-	OpenAIAPIKey  string
-	OpenAIModel   string
-	OpenAIBaseURL string
-	OpenAIDim     int
+	VectorStore      string
+	Embedder         string
+	QdrantURL        string
+	QdrantAPIKey     string
+	ChromaURL        string
+	PGVectorDSN      string
+	TEIBaseURL       string
+	VoyageAPIKey     string
+	VoyageModel      string
+	OpenAIAPIKey     string
+	OpenAIModel      string
+	OpenAIBaseURL    string
+	OpenAIDim        int
 	RerankerModel    string
 	RerankerProvider string
 	CohereAPIKey     string
@@ -82,19 +82,19 @@ func resolveConfig() (*RuntimeConfig, error) {
 	}
 
 	rc := &RuntimeConfig{
-		VectorStore:   cfg.VectorStore,
-		Embedder:      cfg.Embedder,
-		QdrantURL:     cfg.QdrantURL,
-		QdrantAPIKey:  cfg.QdrantAPIKey,
-		ChromaURL:     cfg.ChromaURL,
-		PGVectorDSN:   cfg.PGVectorDSN,
-		TEIBaseURL:    cfg.TEIURL,
-		VoyageAPIKey:  cfg.Voyage.APIKey,
-		VoyageModel:   cfg.Voyage.Model,
-		OpenAIAPIKey:  cfg.OpenAI.APIKey,
-		OpenAIModel:   cfg.OpenAI.Model,
-		OpenAIBaseURL: cfg.OpenAI.BaseURL,
-		OpenAIDim:     cfg.OpenAI.Dim,
+		VectorStore:      cfg.VectorStore,
+		Embedder:         cfg.Embedder,
+		QdrantURL:        cfg.QdrantURL,
+		QdrantAPIKey:     cfg.QdrantAPIKey,
+		ChromaURL:        cfg.ChromaURL,
+		PGVectorDSN:      cfg.PGVectorDSN,
+		TEIBaseURL:       cfg.TEIURL,
+		VoyageAPIKey:     cfg.Voyage.APIKey,
+		VoyageModel:      cfg.Voyage.Model,
+		OpenAIAPIKey:     cfg.OpenAI.APIKey,
+		OpenAIModel:      cfg.OpenAI.Model,
+		OpenAIBaseURL:    cfg.OpenAI.BaseURL,
+		OpenAIDim:        cfg.OpenAI.Dim,
 		RerankerModel:    cfg.RerankerModel,
 		RerankerProvider: cfg.RerankerProvider,
 		CohereAPIKey:     cfg.CohereAPIKey,
@@ -164,31 +164,33 @@ type IndexProjectInput struct {
 }
 
 type SemanticSearchInput struct {
-	ProjectID string `json:"project_id" jsonschema:"Project identifier"`
-	Query     string `json:"query" jsonschema:"Query text"`
-	Limit     int    `json:"limit" jsonschema:"Number of results to return (default 5)"`
-	Recall    int    `json:"recall" jsonschema:"Candidates retrieved before reranking (default 40)"`
-	Hybrid    *bool  `json:"hybrid" jsonschema:"Combine dense + lexical search when the backend supports it (default true)"`
-	Rerank    *bool  `json:"rerank" jsonschema:"Rerank candidates with the reranker when configured (default true)"`
-	Compress  bool   `json:"compress" jsonschema:"Drop near-duplicate results (default false)"`
+	ProjectID string  `json:"project_id" jsonschema:"Project identifier"`
+	Query     string  `json:"query" jsonschema:"Query text"`
+	Limit     int     `json:"limit" jsonschema:"Number of results to return (default 5)"`
+	Recall    int     `json:"recall" jsonschema:"Candidates retrieved before reranking (default 40)"`
+	Hybrid    *bool   `json:"hybrid" jsonschema:"Combine dense + lexical search when the backend supports it (default true)"`
+	Rerank    *bool   `json:"rerank" jsonschema:"Rerank candidates with the reranker when configured (default true)"`
+	Compress  bool    `json:"compress" jsonschema:"Drop near-duplicate results (default false)"`
+	MinScore  float64 `json:"min_score" jsonschema:"Relevance floor: drop results scoring below this, applied after reranking before the top-K cutoff (default 0 = off)"`
 }
 
 type RetrieveContextInput struct {
-	ProjectID string `json:"project_id" jsonschema:"Project identifier"`
-	Query     string `json:"query" jsonschema:"Question or topic to retrieve context for"`
-	Limit     int    `json:"limit" jsonschema:"Number of chunks to retrieve (default 5)"`
-	Recall    int    `json:"recall" jsonschema:"Candidates retrieved before reranking (default 40)"`
-	Hybrid    *bool  `json:"hybrid" jsonschema:"Combine dense + lexical search when the backend supports it (default true)"`
-	Rerank    *bool  `json:"rerank" jsonschema:"Rerank candidates with the reranker when configured (default true)"`
-	Compress  bool   `json:"compress" jsonschema:"Drop near-duplicate results (default false)"`
-	MaxChars  *int   `json:"max_chars" jsonschema:"Character budget for the concatenated context, applied best-first after ranking (default 8000, ~2k tokens); 0 = no cap. When the budget cuts chunks off, the context ends with a '[truncated: N chunks omitted]' marker"`
+	ProjectID string  `json:"project_id" jsonschema:"Project identifier"`
+	Query     string  `json:"query" jsonschema:"Question or topic to retrieve context for"`
+	Limit     int     `json:"limit" jsonschema:"Number of chunks to retrieve (default 5)"`
+	Recall    int     `json:"recall" jsonschema:"Candidates retrieved before reranking (default 40)"`
+	Hybrid    *bool   `json:"hybrid" jsonschema:"Combine dense + lexical search when the backend supports it (default true)"`
+	Rerank    *bool   `json:"rerank" jsonschema:"Rerank candidates with the reranker when configured (default true)"`
+	Compress  bool    `json:"compress" jsonschema:"Drop near-duplicate results (default false)"`
+	MinScore  float64 `json:"min_score" jsonschema:"Relevance floor: drop results scoring below this, applied after reranking before the top-K cutoff (default 0 = off)"`
+	MaxChars  *int    `json:"max_chars" jsonschema:"Character budget for the concatenated context, applied best-first after ranking (default 8000, ~2k tokens); 0 = no cap. When the budget cuts chunks off, the context ends with a '[truncated: N chunks omitted]' marker"`
 }
 
 // searchOptsFromMCP builds SearchOpts from MCP tool inputs. Hybrid and Rerank
 // default to true (nil pointer) so the built-in hybrid/rerank features are used
 // by default from MCP clients; they only take effect when the backend/reranker
 // supports them (otherwise Search falls back gracefully).
-func searchOptsFromMCP(limit, recall int, hybrid, rerank *bool, compress bool) core.SearchOpts {
+func searchOptsFromMCP(limit, recall int, hybrid, rerank *bool, compress bool, minScore float64) core.SearchOpts {
 	b := func(p *bool) bool { return p == nil || *p }
 	return core.SearchOpts{
 		K:        limit,
@@ -196,6 +198,7 @@ func searchOptsFromMCP(limit, recall int, hybrid, rerank *bool, compress bool) c
 		Hybrid:   b(hybrid),
 		Rerank:   b(rerank),
 		Compress: compress,
+		MinScore: minScore,
 	}
 }
 
@@ -409,7 +412,7 @@ func registerMCPTools(server *mcp.Server, svc *core.Service) {
 		Name:        "mind_semantic_search",
 		Description: "Semantic search over a project collection. Returns the most relevant chunks with similarity scores.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in SemanticSearchInput) (*mcp.CallToolResult, any, error) {
-		opts := searchOptsFromMCP(in.Limit, in.Recall, in.Hybrid, in.Rerank, in.Compress)
+		opts := searchOptsFromMCP(in.Limit, in.Recall, in.Hybrid, in.Rerank, in.Compress, in.MinScore)
 		res, err := svc.Search(ctx, in.ProjectID, in.Query, opts)
 		if err != nil {
 			return nil, nil, err
@@ -421,7 +424,7 @@ func registerMCPTools(server *mcp.Server, svc *core.Service) {
 		Name:        "mind_retrieve_context",
 		Description: "Retrieve a compact context string for a project. Fetches top chunks and concatenates them for LLM context, capped by max_chars (default 8000, ~2k tokens) applied best-first after ranking; when the budget cuts chunks off the context ends with '[truncated: N chunks omitted]'. Pass max_chars: 0 for no cap.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in RetrieveContextInput) (*mcp.CallToolResult, any, error) {
-		opts := searchOptsFromMCP(in.Limit, in.Recall, in.Hybrid, in.Rerank, in.Compress)
+		opts := searchOptsFromMCP(in.Limit, in.Recall, in.Hybrid, in.Rerank, in.Compress, in.MinScore)
 		// Core convention: 0 = default budget, negative = no cap. MCP nil =
 		// default (leave 0); explicit 0 means "no cap" per the tool schema.
 		if in.MaxChars != nil && *in.MaxChars == 0 {

@@ -50,7 +50,7 @@ type ProjectStat struct {
 
 // Event is a single SSE event published by the EventBus.
 type Event struct {
-	Type      string    `json:"type"`              // e.g. "index_started", "query_executed"
+	Type      string    `json:"type"` // e.g. "index_started", "query_executed"
 	Timestamp time.Time `json:"timestamp"`
 	Data      any       `json:"data,omitempty"`
 }
@@ -113,11 +113,11 @@ func (b *EventBus) Publish(ev Event) {
 // Service wraps a provider, an optional reranker, and an indexer behind a
 // single API used by both the MCP stdio handlers and the HTTP API layer.
 type Service struct {
-	provider   rag.Provider
-	reranker   rag.Reranker // may be nil
-	indexer    *indexer.Indexer
-	events     *EventBus
-	embedModel string // optional: set by main.go for stats endpoint
+	provider     rag.Provider
+	reranker     rag.Reranker // may be nil
+	indexer      *indexer.Indexer
+	events       *EventBus
+	embedModel   string // optional: set by main.go for stats endpoint
 	metrics      *Metrics
 	metricsStore MetricsStore // optional durable metrics; nil = in-memory only
 	backend      string       // vector store name (e.g. "qdrant"), set by main.go
@@ -361,7 +361,10 @@ func (s *Service) Search(ctx context.Context, projectID, query string, opts Sear
 				r.Score = h.Score
 				reranked = append(reranked, r)
 			}
-			// Defensive clamp: don't rely on the reranker API honoring top_k.
+			// Relevance floor (after rerank scoring, before the top-K cutoff
+			// so K still means "up to K good results"), then a defensive
+			// clamp: don't rely on the reranker API honoring top_k.
+			reranked = applyMinScore(reranked, opts.MinScore)
 			if len(reranked) > k {
 				reranked = reranked[:k]
 			}
@@ -373,11 +376,28 @@ func (s *Service) Search(ctx context.Context, projectID, query string, opts Sear
 		// Reranker failed or returned empty: fall back to semantic order.
 	}
 
+	cands = applyMinScore(cands, opts.MinScore)
 	if len(cands) > k {
 		cands = cands[:k]
 	}
 	out = maybeCompress(cands, opts.Compress)
 	return out, nil
+}
+
+// applyMinScore drops results scoring below the relevance floor. min<=0 is a
+// no-op (fully backward compatible default). Input must already be ranked;
+// the filter preserves order.
+func applyMinScore(results []rag.Result, min float64) []rag.Result {
+	if min <= 0 {
+		return results
+	}
+	out := results[:0:0] // new backing array; don't mutate caller's slice
+	for _, r := range results {
+		if r.Score >= min {
+			out = append(out, r)
+		}
+	}
+	return out
 }
 
 // providerSupportsHybrid reports whether the provider implements the hybrid

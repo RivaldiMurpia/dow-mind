@@ -19,14 +19,14 @@ import (
 // --- Mock Provider ---
 
 type mockProvider struct {
-	mu               sync.Mutex
-	createCalls      int
-	deleteCalls      int
-	indexCalls       int
-	searchCalls      int
-	deletePtCalls    int
-	listPointsCalls  int
-	closeCalls       int
+	mu              sync.Mutex
+	createCalls     int
+	deleteCalls     int
+	indexCalls      int
+	searchCalls     int
+	deletePtCalls   int
+	listPointsCalls int
+	closeCalls      int
 
 	indexDocs []rag.Document // captured by Index for assertions
 
@@ -34,15 +34,15 @@ type mockProvider struct {
 	hybridCalls int
 
 	// Configurable behaviours
-	searchErr   error
-	searchLimit int // captured limit
-	results     []rag.Result
-	points      []rag.PointInfo
-	indexErr    error
-	createErr   error
-	deleteErr   error
-	deletePtErr  error
-	listPtsErr   error
+	searchErr        error
+	searchLimit      int // captured limit
+	results          []rag.Result
+	points           []rag.PointInfo
+	indexErr         error
+	createErr        error
+	deleteErr        error
+	deletePtErr      error
+	listPtsErr       error
 	listedProjectIDs []string
 }
 
@@ -177,13 +177,13 @@ var _ rag.HybridSearcher = (*mockProvider)(nil)
 // --- Mock Reranker ---
 
 type mockReranker struct {
-	mu           sync.Mutex
-	calls        int
-	lastQuery    string
-	lastDocs     []string
-	lastTopK     int
-	rerankErr    error
-	hits         []rag.RerankHit
+	mu        sync.Mutex
+	calls     int
+	lastQuery string
+	lastDocs  []string
+	lastTopK  int
+	rerankErr error
+	hits      []rag.RerankHit
 }
 
 func (m *mockReranker) Rerank(ctx context.Context, query string, docs []string, topK int) ([]rag.RerankHit, error) {
@@ -928,6 +928,88 @@ func TestRetrieveContextBudgetExplicitOverride(t *testing.T) {
 	}
 }
 
+// TestSearchMinScoreFiltersBeforeCutoff verifies that MinScore drops
+// low-scoring results after ranking but BEFORE the top-K cutoff, so K means
+// "up to K good results" (2 pass the floor even though K=3).
+func TestSearchMinScoreFiltersBeforeCutoff(t *testing.T) {
+	p := &mockProvider{results: []rag.Result{
+		{ID: "1", Content: "a", Score: 0.90},
+		{ID: "2", Content: "b", Score: 0.75},
+		{ID: "3", Content: "c", Score: 0.60},
+		{ID: "4", Content: "d", Score: 0.50},
+		{ID: "5", Content: "e", Score: 0.40},
+	}}
+	svc := NewService(p, nil, nil)
+
+	results, err := svc.Search(context.Background(), "proj", "q", SearchOpts{
+		K: 3, Recall: 10, MinScore: 0.7,
+	})
+	if err != nil {
+		t.Fatalf("Search error: %v", err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results >= 0.7, got %d: %v", len(results), results)
+	}
+	if results[0].ID != "1" || results[1].ID != "2" {
+		t.Errorf("expected [1 2], got %v", results)
+	}
+	for _, r := range results {
+		if r.Score < 0.7 {
+			t.Errorf("result %s score %v below floor 0.7", r.ID, r.Score)
+		}
+	}
+}
+
+// TestSearchMinScoreZeroDisabled verifies MinScore=0 (default) leaves behavior
+// unchanged: top-K results are returned regardless of score.
+func TestSearchMinScoreZeroDisabled(t *testing.T) {
+	p := &mockProvider{results: []rag.Result{
+		{ID: "1", Content: "a", Score: 0.90},
+		{ID: "2", Content: "b", Score: 0.75},
+		{ID: "3", Content: "c", Score: 0.60},
+		{ID: "4", Content: "d", Score: 0.50},
+		{ID: "5", Content: "e", Score: 0.40},
+	}}
+	svc := NewService(p, nil, nil)
+
+	results, err := svc.Search(context.Background(), "proj", "q", SearchOpts{K: 3, Recall: 10})
+	if err != nil {
+		t.Fatalf("Search error: %v", err)
+	}
+	if len(results) != 3 {
+		t.Fatalf("expected unchanged top-3, got %d", len(results))
+	}
+}
+
+// TestSearchMinScoreWithRerank verifies the floor is applied to RERANK scores
+// (not semantic scores), after reranking and before the K cutoff.
+func TestSearchMinScoreWithRerank(t *testing.T) {
+	p := &mockProvider{results: []rag.Result{
+		{ID: "1", Content: "a", Score: 0.90},
+		{ID: "2", Content: "b", Score: 0.80},
+		{ID: "3", Content: "c", Score: 0.70},
+	}}
+	reranker := &mockReranker{hits: []rag.RerankHit{
+		{Index: 2, Score: 0.99}, // "c" becomes top hit
+		{Index: 1, Score: 0.65}, // below rerank-score floor
+		{Index: 0, Score: 0.50},
+	}}
+	svc := NewService(p, reranker, nil)
+
+	results, err := svc.Search(context.Background(), "proj", "q", SearchOpts{
+		K: 3, Recall: 10, Rerank: true, MinScore: 0.7,
+	})
+	if err != nil {
+		t.Fatalf("Search error: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected only the rerank hit >= 0.7 to survive, got %d: %v", len(results), results)
+	}
+	if results[0].ID != "3" || results[0].Score != 0.99 {
+		t.Errorf("expected result '3' with rerank score 0.99, got %s/%v", results[0].ID, results[0].Score)
+	}
+}
+
 // --- EventBus tests ---
 
 func TestEventBusSubscribeUnsubscribe(t *testing.T) {
@@ -1256,8 +1338,12 @@ type mockProviderNonHybrid struct {
 	searchCalls int
 }
 
-func (m *mockProviderNonHybrid) CreateCollection(ctx context.Context, projectID string) error { return nil }
-func (m *mockProviderNonHybrid) DeleteCollection(ctx context.Context, projectID string) error { return nil }
+func (m *mockProviderNonHybrid) CreateCollection(ctx context.Context, projectID string) error {
+	return nil
+}
+func (m *mockProviderNonHybrid) DeleteCollection(ctx context.Context, projectID string) error {
+	return nil
+}
 func (m *mockProviderNonHybrid) Index(ctx context.Context, projectID string, docs []rag.Document) error {
 	return nil
 }
